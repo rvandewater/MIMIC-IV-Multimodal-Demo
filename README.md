@@ -11,10 +11,29 @@ that verifies every file against its checksum.
 | `mimic-iv-ed-demo` 2.2 | open | everything: ED stays, triage, vitals |
 | `mimic-iv-ecg-demo` 0.1 | open | everything: 12-lead ECG waveforms |
 | `mimic-iv-ecg` 1.0 | open | tables only (machine measurements, ECG report text), demo patients' rows |
+| `mimic4wdb` 0.1.0 | open | demo patients' ICU bedside-monitor waveforms and numerics (WFDB records under `waves/`) |
 | `mimic-cxr-jpg` 2.1.0 | credentialed | demo patients' chest X-ray JPGs; metadata and label tables filtered to them |
 | `mimic-iv-echo` 1.0.1 | credentialed | demo patients' echo DICOMs; record list and measurements filtered to them |
 | `mimic-iv-note` 2.2 | credentialed | discharge summaries and radiology reports (plus detail tables), demo patients' rows |
 | `mimic-cxr` 2.0.0 | credentialed | optional (`--include mimic-cxr`): chest X-ray DICOMs and per-study report text |
+
+The waveform database is an early pre-release with about 200 patients, so only
+a handful of the 100 demo patients (4 in 0.1.0, about 330 MB) have waveforms.
+Its top-level `RECORDS` file is copied as is, so it still lists every record in
+the release, including ones that aren't downloaded.
+
+## What the demo patients have
+
+How many of the demo patients have each modality, and which modalities occur
+together. Each column of the co-occurrence plot counts the patients with exactly
+that set of modalities.
+
+<!-- modality-overview:start -->
+_Not generated yet: run `uv run --extra figure mimic-demo-mm figure --readme README.md`
+after a complete download (see [Overview figure](#overview-figure))._
+<!-- modality-overview:end -->
+
+## Access
 
 For the credentialed sources you need a credentialed PhysioNet account, and you
 must have signed each project's data use agreement.
@@ -93,11 +112,29 @@ The exit code is 0 when complete, 1 when incomplete, and 2 on an error such as
 a wrong password or an unsigned agreement. Paths of problem files go to
 `mimic-demo-mm.check-report.txt` next to the data.
 
+### Overview figure
+
+```bash
+uv run --extra figure mimic-demo-mm figure                       # writes docs/modality-overview-{light,dark}.svg
+uv run --extra figure mimic-demo-mm figure --readme README.md    # and refreshes the overview above
+```
+
+It counts the files that pass a size check, so run it after a complete
+download. Modalities are grouped:
+- **ECG:** waveforms or machine reports
+- **Chest X-ray:** JPG or DICOM
+- **Echo:** DICOMs or measurements
+- **Notes:** discharge summaries or radiology reports
+
+EHR is left out of the co-occurrence plot because every demo patient has it.
+The figure and table show patient counts only, never IDs.
+
 ## Output layout
 
 ```
 mimic-demo-multimodal/
   mimic-iv-demo/2.2/...                        (PhysioNet's own layout)
+  mimic4wdb/0.1.0/waves/p100/p100xxxxx/<record>/<record>.hea ...
   mimic-cxr-jpg/2.1.0/files/p10/p10000032/s.../....jpg
   mimic-cxr-jpg/2.1.0/mimic-cxr-2.0.0-metadata.csv.gz   (demo patients' rows only)
   mimic-iv-echo/1.0.1/files/...  echo-record-list.csv ...

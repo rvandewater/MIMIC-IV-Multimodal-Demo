@@ -71,13 +71,12 @@ class LocalOrigin:
             return entries, "local SHA256SUMS.txt"
         # No checksum list: walk the folder, but only the demo patients' part of files/.
         out = []
-        top = [p for p in self.dir.iterdir()]
-        stack = [p for p in top if not (p.name == "files" and p.is_dir())]
-        files_dir = self.dir / "files"
+        files_dir = self.dir / self.src.files_dir
+        stack = [p for p in self.dir.iterdir() if p != files_dir]
         if files_dir.is_dir() and self.src.mode == "full":
             stack.append(files_dir)
         elif files_dir.is_dir() and self.src.mode == "demo":
-            stack += [files_dir / f"p{i[:2]}" / f"p{i}" for i in sorted(ids)]
+            stack += [self.dir / self.src.patient_dir(i) for i in sorted(ids)]
         while stack:
             p = stack.pop()
             if p.is_dir():

@@ -6,6 +6,7 @@ import gzip
 import io
 import json
 import os
+import shutil
 from contextlib import redirect_stdout
 from pathlib import Path
 
@@ -59,8 +60,8 @@ def test_download_completes_and_check_passes(full):
     out, code, text = full
     assert code == 0, text
     assert "COMPLETE: every expected file is present and matches its checksum" in text
-    for src in ("mimic-iv-demo", "mimic-iv-ed-demo", "mimic-iv-ecg-demo", "mimic-iv-ecg", "mimic-cxr-jpg",
-                "mimic-iv-echo", "mimic-iv-note"):
+    for src in ("mimic-iv-demo", "mimic-iv-ed-demo", "mimic-iv-ecg-demo", "mimic-iv-ecg", "mimic4wdb",
+                "mimic-cxr-jpg", "mimic-iv-echo", "mimic-iv-note"):
         assert f"{src}" in text
 
 
@@ -83,6 +84,15 @@ def test_only_demo_patients_files_and_rows(full, server):
     mm = rows(out / "mimic-iv-ecg/1.0/machine_measurements.csv")
     assert len(mm) == facts["demo_ecg_reports"] and "\n" in mm[0]["report_1"]
     assert len(rows(out / "mimic-iv-echo/1.0.1/echo_structured_measurements.csv")) == facts["demo_echo_meas"]
+    # waveform database: demo patients' records under waves/p100/..., numerics copied byte for byte
+    wdb = out / "mimic4wdb/0.1.0"
+    heas = list((wdb / "waves").rglob("*.hea"))
+    assert len(heas) == len(facts["who"]["wdb"])
+    assert all(p.parent.parent.name[1:] in demo and p.parents[2].name == p.parent.parent.name[:4] for p in heas)
+    nums = list((wdb / "waves").rglob("*n.csv.gz"))
+    assert len(nums) == len(facts["who"]["wdb"])
+    assert all(n.read_bytes() == (server[0] / "mimic4wdb/0.1.0" / n.relative_to(wdb)).read_bytes() for n in nums)
+    assert (wdb / "RECORDS").exists() and (wdb / "LICENSE.txt").exists()
     # tables without subject_id are kept whole
     assert (out / "mimic-iv-echo/1.0.1/echo-study-list.csv").exists()
     assert (out / "mimic-iv-ecg/1.0/machine_measurements_data_dictionary.csv").exists()
@@ -102,8 +112,29 @@ def test_coverage_counts(full, server):
     assert lines["chest X-ray images (JPG)"] == len(who["cxr"])
     assert lines["echo DICOMs"] == len(who["echo"])
     assert lines["ECG waveforms"] == len(who["ecg"])
+    assert lines["ICU bedside-monitor waveforms"] == len(who["wdb"])
     assert lines["emergency department stays"] == len(who["ed"])
     assert lines["discharge summaries"] == 15
+
+
+def test_figure_and_readme_overview(full, tmp_path):
+    pytest.importorskip("matplotlib")
+    out, _, _ = full
+    readme = tmp_path / "README.md"
+    readme.write_text("# x\n\n<!-- modality-overview:start -->\nold\n<!-- modality-overview:end -->\n\nafter\n")
+    code, text = run("figure", "--out", str(out), "--to", str(tmp_path / "docs"), "--readme", str(readme))
+    assert code == 0, text
+    svgs = [tmp_path / "docs" / f"modality-overview-{t}.svg" for t in ("light", "dark")]
+    assert all(p.exists() and p.read_text().lstrip().startswith("<?xml") for p in svgs)
+    md = readme.read_text()
+    assert "old" not in md and md.endswith("after\n")
+    assert 'srcset="docs/modality-overview-dark.svg"' in md
+    for line in ("| EHR (hosp, ICU) | 20 |", "| Notes | 20 |", "| ECG | 16 |", "| ED stay | 9 |",
+                 "| Chest X-ray | 12 |", "| Echo | 8 |", "| ICU waveforms | 3 |"):
+        assert line in md
+    assert "3 of 20 patients have every modality above" in md
+    blob = md + text + "".join(p.read_text() for p in svgs)
+    assert not any(s in blob for s in mp.DEMO + mp.OTHER)
 
 
 def test_rerun_fetches_nothing(full):
@@ -182,6 +213,19 @@ def test_local_must_not_be_the_output_folder(server, tmp_path):
     code, text = run("download", "--out", str(root), "--yes", "--only", "mimic-iv-note",
                      "--local", f"mimic-iv-note={root / 'mimic-iv-note/2.2'}")
     assert code != 0 or "output folder itself" in text
+
+
+def test_local_waveform_copy_without_checksums(server, tmp_path):
+    root, _, facts = server
+    local = tmp_path / "mimic4wdb/0.1.0"
+    shutil.copytree(root / "mimic4wdb/0.1.0", local)
+    (local / "SHA256SUMS.txt").unlink()                                   # force the folder walk
+    out = tmp_path / "out"
+    code, text = run("download", "--out", str(out), "--yes", "--only", "mimic-iv-demo", "mimic4wdb",
+                     "--local", f"mimic4wdb={local}")
+    assert code == 0, text
+    heas = list((out / "mimic4wdb/0.1.0/waves").rglob("*.hea"))
+    assert len(heas) == len(facts["who"]["wdb"])
 
 
 def test_plan_only_downloads_nothing(tmp_path):

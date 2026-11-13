@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "mimic-demo-mm"
 version = "0.1.0"
-description = "Assemble a local multimodal MIMIC-IV demo: the 100 demo patients across EHR, ECG, chest X-ray, echo and notes"
+description = "Assemble a local multimodal MIMIC-IV demo: the 100 demo patients across EHR, ECG, ICU waveforms, chest X-ray, echo and notes"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = ["requests>=2.28", "tqdm>=4.60"]
@@ -14,7 +14,8 @@ dependencies = ["requests>=2.28", "tqdm>=4.60"]
 mimic-demo-mm = "mimic_demo_mm.cli:main"
 
 [project.optional-dependencies]
-test = ["pytest>=7"]
+test = ["pytest>=7", "matplotlib>=3.6"]
+figure = ["matplotlib>=3.6"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mimic_demo_mm"]

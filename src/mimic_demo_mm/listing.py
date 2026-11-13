@@ -18,8 +18,8 @@ SUBJECT_DIR = re.compile(r"(?:^|/)p(\d{8})/")
 HREF = re.compile(r'href="([^"?#]+)"')
 
 
-def is_table(path: str) -> bool:
-    return not path.startswith("files/") and path.lower().endswith((".csv", ".csv.gz"))
+def is_table(path: str, src: Source) -> bool:
+    return not src.in_files(path) and path.lower().endswith((".csv", ".csv.gz"))
 
 
 def subject_of(path: str) -> str | None:
@@ -31,8 +31,8 @@ def keep_fn(src: Source, demo_ids: set[str]) -> Callable[[str], bool]:
     if src.mode == "full":
         return lambda p: True
     if src.mode == "tables":
-        return lambda p: not p.startswith("files/")
-    return lambda p: (not p.startswith("files/")) or subject_of(p) in demo_ids
+        return lambda p: not src.in_files(p)
+    return lambda p: (not src.in_files(p)) or subject_of(p) in demo_ids
 
 
 def _parse_sums(lines: Iterable[str], keep) -> list[tuple[str, str | None]]:
@@ -67,7 +67,7 @@ def _crawl(client: Client, src: Source, auth: bool, roots: list[str], keep, deep
                 continue
             path = d + href
             if href.endswith("/"):
-                if path == "files/" and not deep_files:
+                if path == f"{src.files_dir}/" and not deep_files:
                     continue
                 todo.append(path)
             elif path != "SHA256SUMS.txt" and keep(path):
@@ -96,6 +96,6 @@ def list_files(client: Client, src: Source, demo_ids: set[str]) -> tuple[list[tu
     except NotFound:
         pass
     if src.mode == "demo":
-        roots = [""] + [f"files/p{i[:2]}/p{i}/" for i in sorted(demo_ids)]
+        roots = [""] + [src.patient_dir(i) for i in sorted(demo_ids)]
         return _crawl(client, src, auth, roots, keep, deep_files=False), "directory listing"
     return _crawl(client, src, auth, [""], keep, deep_files=src.mode == "full"), "directory listing"

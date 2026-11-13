@@ -52,7 +52,7 @@ def _sums(root: Path):
 
 def build(root: Path) -> dict:
     rng = random.Random(0)
-    who = {"cxr": DEMO[:12], "echo": DEMO[2:6], "ecg": DEMO[:16], "ed": DEMO[:9]}
+    who = {"cxr": DEMO[:12], "echo": DEMO[2:6], "ecg": DEMO[:16], "ed": DEMO[:9], "wdb": DEMO[3:6]}
     # --- open demo releases
     d = root / "mimic-iv-demo/2.2"
     _w(d / "demo_subject_id.csv", _csv([[s] for s in DEMO], ["subject_id"]))
@@ -78,6 +78,21 @@ def build(root: Path) -> dict:
     _w(d / "machine_measurements.csv", _csv(mm, ["subject_id", "study_id", "report_0", "report_1"]))
     _w(d / "machine_measurements_data_dictionary.csv", _csv([["report_0", "text"]], ["variable", "description"]))
     _w(d / f"files/p1800/p{OTHER[0]}/s1/1.dat", os.urandom(5000))   # must NOT be fetched
+    _sums(d)
+    # --- open waveform database: waves/pXXX/pXXXXXXXX/<record>/, numerics as .csv.gz (files, not tables)
+    d = root / "mimic4wdb/0.1.0"
+    recs = []
+    for i, s in enumerate(who["wdb"] + OTHER[:4]):
+        pdir = f"waves/p{s[:3]}/p{s}/"
+        rec = str(80000000 + i)
+        _w(d / pdir / rec / f"{rec}.hea", f"{rec}/3 2 62.4725 1000\n")
+        for seg in range(2):
+            _w(d / pdir / rec / f"{rec}_{seg:04d}.dat", os.urandom(rng.randint(5_000, 20_000)))
+        _w(d / pdir / rec / f"{rec}n.csv.gz", _csv([[0, 72], [1, 74]], ["time", "HR"], gz=True))
+        _w(d / pdir / "RECORDS", f"{rec}/\n")
+        recs.append(pdir)
+    _w(d / "RECORDS", "\n".join(recs) + "\n")
+    _w(d / "LICENSE.txt", "ODbL\n")
     _sums(d)
     # --- credentialed: CXR-JPG
     d = root / "mimic-cxr-jpg/2.1.0"

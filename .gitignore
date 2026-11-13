@@ -1,0 +1,12 @@
+# Generated from local (partly credentialed) data: never commit
+docs/modality-overview-*.svg
+docs/modality-overview-*.png
+mimic-demo-multimodal/
+mimic-demo-mm.manifest.json
+mimic-demo-mm.check-report.txt
+
+# Python / uv
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/

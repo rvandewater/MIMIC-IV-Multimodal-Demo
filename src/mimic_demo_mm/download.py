@@ -80,7 +80,7 @@ def plan(origins: dict, sources: list[Source], ids: set[str], man: Manifest, job
                                 "origin": o.describe(), "listing": how,
                                 "local_dir": str(o.dir) if isinstance(o, LocalOrigin) else None}
         for path, sha in entries:
-            kind = "table" if (src.mode != "full" and is_table(path)) else "file"
+            kind = "table" if (src.mode != "full" and is_table(path, src)) else "file"
             planned.append(Item(src.key, path, kind, sha256=sha))
         print(f"  {src.key:<18} {len(entries):>7,} files/tables listed  [{o.describe()}, {how}]")
     items = man.merge(planned)
@@ -98,7 +98,7 @@ def plan(origins: dict, sources: list[Source], ids: set[str], man: Manifest, job
                 b.update()
     for it in items:  # other large top-level files are not needed (e.g. IMAGE_FILENAMES, report zips)
         src = BY_KEY[it.source]
-        if src.mode != "full" and it.kind == "file" and not it.path.startswith("files/") \
+        if src.mode != "full" and it.kind == "file" and not src.in_files(it.path) \
                 and (it.size or 0) > SMALL_FILE:
             it.status, it.note = "skipped", "large top-level file, not needed for the demo patients"
     return items

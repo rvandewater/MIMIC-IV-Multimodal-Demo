@@ -5,6 +5,7 @@
   mimic-demo-mm download --local mimic-iv-note=/data/mimic-iv-note/2.2 ...
                                                 take subsets from local copies instead
   mimic-demo-mm check [--fix]                   verify every file; re-fetch broken ones
+  mimic-demo-mm figure [--readme README.md]     draw the modality coverage / co-occurrence overview
 """
 from __future__ import annotations
 
@@ -112,6 +113,16 @@ def cmd_check(a) -> int:
     return _download(root, sources, local, a.link, a.user, a.jobs, True, False, False)
 
 
+def cmd_figure(a) -> int:
+    try:
+        import matplotlib  # noqa: F401
+    except ImportError:
+        print("x the figure needs matplotlib: run `uv run --extra figure mimic-demo-mm figure ...`")
+        return 2
+    from .figure import run
+    return run(Path(a.out).resolve(), Path(a.to), Path(a.readme) if a.readme else None)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="mimic-demo-mm", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -145,6 +156,12 @@ def main(argv=None) -> int:
     c.add_argument("--quick", action="store_true", help="sizes only (skip checksums)")
     c.add_argument("--fix", action="store_true", help="re-fetch missing, partial or corrupt files")
     c.set_defaults(fn=cmd_check)
+
+    g = sub.add_parser("figure", help="draw the modality coverage and co-occurrence overview (counts only)")
+    g.add_argument("--out", default="mimic-demo-multimodal", help="data folder (default: %(default)s)")
+    g.add_argument("--to", default="docs", help="folder for the SVGs (default: %(default)s)")
+    g.add_argument("--readme", help="also update the overview section of this README")
+    g.set_defaults(fn=cmd_figure)
 
     a = ap.parse_args(argv)
     try:

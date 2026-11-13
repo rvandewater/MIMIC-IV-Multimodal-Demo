@@ -61,12 +61,13 @@ def _ed_subjects(root: Path) -> set[str]:
         return {row["subject_id"] for row in r}
 
 
-def coverage(root: Path, man: Manifest, res: dict) -> list[tuple[str, set[str]]]:
+def coverage(root: Path, man: Manifest, res: dict) -> list[tuple[str, set[str] | None, str]]:
+    """-> [(label, demo patients with it or None for all of them, modality group)]."""
     ok = [man.items[k] for k, v in res.items() if v == OK]
     present = set(man.sources)
 
     def files_of(src, exts):
-        return {subject_of(i.path) for i in ok if i.source == src and i.path.startswith("files/")
+        return {subject_of(i.path) for i in ok if i.source == src and BY_KEY[src].in_files(i.path)
                 and i.path.lower().endswith(exts)} - {None}
 
     def tables_of(src, name):
@@ -78,20 +79,21 @@ def coverage(root: Path, man: Manifest, res: dict) -> list[tuple[str, set[str]]]
 
     rows = []
     if "mimic-iv-demo" in present:
-        rows.append(("structured, categorical and numeric events (EHR)", None))
+        rows.append(("structured, categorical and numeric events (EHR)", None, "EHR"))
     if "mimic-iv-ed-demo" in present:
-        rows.append(("emergency department stays", _ed_subjects(root)))
-    for key, label, kind, arg in (
-            ("mimic-iv-ecg-demo", "ECG waveforms", "files", (".hea",)),
-            ("mimic-iv-ecg", "ECG machine reports (text)", "tables", "machine_measurements"),
-            ("mimic-cxr-jpg", "chest X-ray images (JPG)", "files", (".jpg",)),
-            ("mimic-cxr", "chest X-ray DICOMs", "files", (".dcm",)),
-            ("mimic-iv-echo", "echo DICOMs", "files", (".dcm",)),
-            ("mimic-iv-echo", "echo measurements", "tables", "measurement"),
-            ("mimic-iv-note", "discharge summaries", "tables", "discharge.csv"),
-            ("mimic-iv-note", "radiology reports", "tables", "radiology.csv")):
+        rows.append(("emergency department stays", _ed_subjects(root), "ED stay"))
+    for key, label, kind, arg, group in (
+            ("mimic-iv-ecg-demo", "ECG waveforms", "files", (".hea",), "ECG"),
+            ("mimic-iv-ecg", "ECG machine reports (text)", "tables", "machine_measurements", "ECG"),
+            ("mimic4wdb", "ICU bedside-monitor waveforms", "files", (".hea",), "ICU waveforms"),
+            ("mimic-cxr-jpg", "chest X-ray images (JPG)", "files", (".jpg",), "Chest X-ray"),
+            ("mimic-cxr", "chest X-ray DICOMs", "files", (".dcm",), "Chest X-ray"),
+            ("mimic-iv-echo", "echo DICOMs", "files", (".dcm",), "Echo"),
+            ("mimic-iv-echo", "echo measurements", "tables", "measurement", "Echo"),
+            ("mimic-iv-note", "discharge summaries", "tables", "discharge.csv", "Notes"),
+            ("mimic-iv-note", "radiology reports", "tables", "radiology.csv", "Notes")):
         if key in present:
-            rows.append((label, files_of(key, arg) if kind == "files" else tables_of(key, arg)))
+            rows.append((label, files_of(key, arg) if kind == "files" else tables_of(key, arg), group))
     return rows
 
 
@@ -116,11 +118,12 @@ def report(root: Path, man: Manifest, res: dict, quick: bool) -> bool:
     n_demo = man.demo_subjects or 0
     print(f"\n== Demo patients per modality (of {n_demo}) ==")
     rows = coverage(root, man, res)
-    for label, s in rows:
+    for label, s, _ in rows:
         print(f"  {label:<48}{n_demo if s is None else len(s):>5}")
-    sets = [s for label, s in rows if s is not None and label not in ("emergency department stays",)]
+    optional = ("emergency department stays", "ICU bedside-monitor waveforms")   # few patients have these
+    sets = [s for label, s, _ in rows if s is not None and label not in optional]
     if len(sets) > 1:
-        label = "with all of the above (ED stay not required)"
+        label = "with all of the above (ED, waveforms optional)"
         print(f"  {label:<48}{len(set.intersection(*sets)):>5}")
 
     bad = [(k, v) for k, v in res.items() if v in (MISSING, INCOMPLETE, CORRUPT)]
