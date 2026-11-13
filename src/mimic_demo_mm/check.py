@@ -64,7 +64,7 @@ def _ed_subjects(root: Path) -> set[str]:
 def coverage(root: Path, man: Manifest, res: dict) -> list[tuple[str, set[str] | None, str]]:
     """-> [(label, demo patients with it or None for all of them, modality group)]."""
     ok = [man.items[k] for k, v in res.items() if v == OK]
-    present = set(man.sources)
+    present = {src for src, _ in res}   # only the sources that were checked
 
     def files_of(src, exts):
         return {subject_of(i.path) for i in ok if i.source == src and BY_KEY[src].in_files(i.path)
@@ -108,7 +108,8 @@ def report(root: Path, man: Manifest, res: dict, quick: bool) -> bool:
     print(f"\n== File check{' (sizes only)' if quick else ' (checksums)'} ==")
     print(f"  {'source':<18}{'ok':>8}{'missing':>9}{'partial':>9}{'corrupt':>9}{'skipped':>9}{'size':>11}  status")
     complete = True
-    for key in man.sources:
+    checked = {src for src, _ in res}
+    for key in [k for k in man.sources if k in checked]:
         c = per.get(key, Counter())
         bad = c[MISSING] + c[INCOMPLETE] + c[CORRUPT]
         complete &= bad == 0 and c[OK] > 0

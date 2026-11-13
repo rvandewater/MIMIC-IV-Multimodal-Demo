@@ -120,7 +120,10 @@ def cmd_figure(a) -> int:
         print("x the figure needs matplotlib: run `uv run --extra figure mimic-demo-mm figure ...`")
         return 2
     from .figure import run
-    return run(Path(a.out).resolve(), Path(a.to), Path(a.readme) if a.readme else None)
+    if a.min_count < 1:
+        print("x --min-count must be at least 1")
+        return 2
+    return run(Path(a.out).resolve(), Path(a.to), Path(a.readme) if a.readme else None, a.min_count)
 
 
 def main(argv=None) -> int:
@@ -161,6 +164,9 @@ def main(argv=None) -> int:
     g.add_argument("--out", default="mimic-demo-multimodal", help="data folder (default: %(default)s)")
     g.add_argument("--to", default="docs", help="folder for the SVGs (default: %(default)s)")
     g.add_argument("--readme", help="also update the overview section of this README")
+    g.add_argument("--min-count", type=int, default=5,
+                   help="show smaller counts as '<N' and merge smaller combinations into 'other' "
+                        "(default: %(default)s; 1 shows everything)")
     g.set_defaults(fn=cmd_figure)
 
     a = ap.parse_args(argv)

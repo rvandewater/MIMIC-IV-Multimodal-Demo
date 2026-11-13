@@ -2,7 +2,9 @@
 modalities occur together (an UpSet plot).
 
 Built from a finished download (the files that pass the check). The figure,
-the table and the console show patient counts only, never IDs.
+the table and the console show patient counts only, never IDs. Counts below
+``min_count`` (default 5) are shown as "<5", and combinations with fewer patients
+are merged into one "other" column, so no small group is visible.
 
 Writes two SVGs, one for light and one for dark backgrounds, and can update the
 overview section of a README between the markers below.
@@ -23,6 +25,8 @@ START, END = "<!-- modality-overview:start -->", "<!-- modality-overview:end -->
 # Matrix rows, top to bottom. EHR is left out: every demo patient has it.
 GROUPS = ["Notes", "ECG", "ED stay", "Chest X-ray", "Echo", "ICU waveforms"]
 MAX_COLUMNS = 16
+MIN_COUNT = 5
+OTHER = None   # the merged column of small combinations
 
 THEMES = {   # single series: one hue, neutral ink (validated against both surfaces)
     "light": dict(bar="#2a78d6", ink="#0b0b0b", ink2="#52514e", grid="#e4e3df", off="#d9d8d4"),
@@ -50,6 +54,19 @@ def intersections(universe: set[str], groups: dict[str, set[str]]) -> list[tuple
     """Exclusive combinations: each patient counted once, under exactly the modalities they have."""
     combos = Counter(tuple(g for g in groups if pid in groups[g]) for pid in universe)
     return sorted(combos.items(), key=lambda kv: (-kv[1], len(kv[0]), [GROUPS.index(g) for g in kv[0]]))
+
+
+def fmt(k: int, min_count: int) -> str:
+    return str(k) if k == 0 or k >= min_count else f"<{min_count}"
+
+
+def columns(universe, groups, min_count: int) -> list[tuple[tuple[str, ...] | None, int]]:
+    """Combinations with at least ``min_count`` patients (at most MAX_COLUMNS), then
+    one OTHER column holding everyone else."""
+    combos = intersections(universe, groups)
+    big = [(c, k) for c, k in combos if k >= min_count][:MAX_COLUMNS]
+    other = sum(k for _, k in combos) - sum(k for _, k in big)
+    return big + ([(OTHER, other)] if other else [])
 
 
 # ---------------------------------------------------------------- drawing
@@ -85,7 +102,7 @@ def _style(ax, t):
     ax.tick_params(colors=t["ink2"], labelcolor=t["ink2"], length=0, labelsize=8.5)
 
 
-def draw(universe, groups, has_ehr, theme: str, dest: Path) -> None:
+def draw(universe, groups, has_ehr, theme: str, dest: Path, min_count: int = MIN_COUNT) -> None:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -95,14 +112,14 @@ def draw(universe, groups, has_ehr, theme: str, dest: Path) -> None:
                          "font.family": ["Helvetica", "Arial", "DejaVu Sans", "sans-serif"]})
     n = len(universe)
     names = list(groups)
-    combos = intersections(universe, groups)
-    shown, rest = combos[:MAX_COLUMNS], combos[MAX_COLUMNS:]
+    shown = columns(universe, groups, min_count)
     ncol, nrow = len(shown), len(names)
+    visible = lambda k: k == 0 or k >= min_count   # a suppressed count gets no bar: its length would tell
 
     fig = plt.figure(figsize=(1.9 + 0.36 * max(ncol, 6) + 0.6, 1.5 + 0.3 * nrow + 1.6))
     fig.patch.set_alpha(0)
     gs = fig.add_gridspec(2, 2, width_ratios=[1.9, 0.36 * max(ncol, 6)], height_ratios=[1.6, 0.3 * nrow],
-                          wspace=0.05, hspace=0.06, left=0.17, right=0.98, top=0.84, bottom=0.09)
+                          wspace=0.05, hspace=0.06, left=0.17, right=0.98, top=0.80, bottom=0.09)
     ax_cov = fig.add_subplot(gs[1, 0])
     ax_mat = fig.add_subplot(gs[1, 1], sharey=ax_cov)
     ax_int = fig.add_subplot(gs[0, 1], sharex=ax_mat)
@@ -111,7 +128,7 @@ def draw(universe, groups, has_ehr, theme: str, dest: Path) -> None:
 
     # fix every limit before drawing: the rounded ends are sized in pixels from them
     ys = list(range(nrow))[::-1]
-    top = max((c for _, c in shown), default=1)
+    top = max([c for _, c in shown if visible(c)] + [min_count, 1])
     ax_cov.set_xlim(0, n * 1.35 or 1)
     ax_cov.set_ylim(-0.6, nrow - 0.4)
     ax_int.set_xlim(-0.6, max(ncol, 6) - 0.4)
@@ -123,8 +140,10 @@ def draw(universe, groups, has_ehr, theme: str, dest: Path) -> None:
     # coverage: patients with >= 1 record of each modality, one row per modality
     for y, g in zip(ys, names):
         k = len(groups[g])
-        _rounded_bar(ax_cov, 0, y - 0.28, k, 0.56, t["bar"], horizontal=True)
-        ax_cov.text(k + n * 0.03, y, f"{k}", va="center", ha="left", fontsize=8.5, color=t["ink"])
+        if visible(k):
+            _rounded_bar(ax_cov, 0, y - 0.28, k, 0.56, t["bar"], horizontal=True)
+        ax_cov.text((k if visible(k) else 0) + n * 0.03, y, fmt(k, min_count), va="center", ha="left",
+                    fontsize=8.5, color=t["ink"])
     ax_cov.set_yticks(ys, names, fontsize=9, color=t["ink"])
     ax_cov.set_xticks([])
     ax_cov.set_title(f"Patients with ≥ 1\n(of {n})", fontsize=8.5, color=t["ink2"], loc="left", pad=4)
@@ -135,13 +154,19 @@ def draw(universe, groups, has_ehr, theme: str, dest: Path) -> None:
     ax_int.tick_params(axis="x", labelbottom=False)
     ax_int.set_ylabel("Patients", fontsize=8.5, color=t["ink2"])
     for x, (combo, c) in enumerate(shown):
-        _rounded_bar(ax_int, x - 0.3, 0, 0.6, c, t["bar"], horizontal=False)
-        ax_int.text(x, c + top * 0.03, f"{c}", ha="center", va="bottom", fontsize=8.5, color=t["ink"])
+        if visible(c):
+            _rounded_bar(ax_int, x - 0.3, 0, 0.6, c, t["bar"], horizontal=False)
+        ax_int.text(x, (c if visible(c) else 0) + top * 0.03, fmt(c, min_count), ha="center", va="bottom",
+                    fontsize=8.5, color=t["ink"])
 
     # membership matrix
     ax_mat.tick_params(axis="y", labelleft=False)
     ax_mat.set_xticks([])
     for x, (combo, _) in enumerate(shown):
+        if combo is OTHER:
+            ax_mat.text(x, (nrow - 1) / 2, "other", ha="center", va="center", rotation=90,
+                        fontsize=8, color=t["ink2"])
+            continue
         on = [y for y, g in zip(ys, names) if g in combo]
         ax_mat.scatter([x] * nrow, ys, s=42, color=t["off"], zorder=1, linewidths=0)
         if len(on) > 1:
@@ -155,19 +180,21 @@ def draw(universe, groups, has_ehr, theme: str, dest: Path) -> None:
     title = "Modality coverage and co-occurrence"
     sub = (f"{n} MIMIC-IV demo patients" + (", all with EHR data." if has_ehr else ".")
            + "\nEach column counts the patients with exactly that set of modalities (each patient once)."
-           + (f" {len(rest)} rarer combinations ({sum(c for _, c in rest)} patients) not shown." if rest else ""))
+           + (f"\nCounts below {min_count} are shown as <{min_count}; combinations with fewer than {min_count} "
+              "patients are merged into \"other\"." if min_count > 1 else ""))
     fig.text(0.02, 0.965, title, fontsize=11.5, fontweight="bold", color=t["ink"], va="top")
-    fig.text(0.02, 0.915, sub, fontsize=8, color=t["ink2"], va="top", linespacing=1.4)
+    fig.text(0.02, 0.918, sub, fontsize=8, color=t["ink2"], va="top", linespacing=1.4)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(dest, transparent=True, dpi=200, **({"metadata": {"Date": None}} if dest.suffix == ".svg" else {}))
+    fig.savefig(dest, transparent=True, dpi=200, bbox_inches="tight", pad_inches=0.15,   # never clip labels
+                **({"metadata": {"Date": None}} if dest.suffix == ".svg" else {}))
     plt.close(fig)
 
 
 # ---------------------------------------------------------------- README section
-def markdown(universe, groups, has_ehr, light: str, dark: str) -> str:
+def markdown(universe, groups, has_ehr, light: str, dark: str, min_count: int = MIN_COUNT) -> str:
     n = len(universe)
     combos = intersections(universe, groups)
-    alt = "; ".join(f"{g} {len(s)}" for g, s in groups.items())
+    alt = "; ".join(f"{g} {fmt(len(s), min_count)}" for g, s in groups.items())
     lines = [START, "",
              "<picture>",
              f'  <source media="(prefers-color-scheme: dark)" srcset="{dark}">',
@@ -176,9 +203,10 @@ def markdown(universe, groups, has_ehr, light: str, dark: str) -> str:
              f"| modality | demo patients (of {n}) |", "|---|---:|"]
     if has_ehr:
         lines.append(f"| EHR (hosp, ICU) | {n} |")
-    lines += [f"| {g} | {len(s)} |" for g, s in groups.items()]
+    lines += [f"| {g} | {fmt(len(s), min_count)} |" for g, s in groups.items()]
     every = sum(c for combo, c in combos if len(combo) == len(groups))
-    lines += ["", f"{every} of {n} patients have every modality above. "
+    lines += ["", f"{fmt(every, min_count)} of {n} patients have every modality above. "
+              + (f"Counts below {min_count} are shown as <{min_count}. " if min_count > 1 else "") +
               f"Generated by `mimic-demo-mm figure` on {time.strftime('%Y-%m-%d')} from a complete download "
               "(counts only).", "", END]
     return "\n".join(lines)
@@ -194,7 +222,7 @@ def update_readme(readme: Path, block: str) -> bool:
     return True
 
 
-def run(root: Path, to: Path, readme: Path | None) -> int:
+def run(root: Path, to: Path, readme: Path | None, min_count: int = MIN_COUNT) -> int:
     man = Manifest.load(root)
     if not man.items:
         print(f"No manifest in {root}. Run `mimic-demo-mm download` first (or pass --out).")
@@ -210,15 +238,15 @@ def run(root: Path, to: Path, readme: Path | None) -> int:
               "Run `mimic-demo-mm check --fix` first for a complete picture.")
     paths = {th: to / f"modality-overview-{th}.svg" for th in THEMES}
     for th, p in paths.items():
-        draw(universe, groups, has_ehr, th, p)
+        draw(universe, groups, has_ehr, th, p, min_count)
     print(f"  wrote {paths['light']} and {paths['dark']}")
     print(f"\n  {'modality':<16}{'patients':>9}  (of {len(universe)})")
     for g, s in groups.items():
-        print(f"  {g:<16}{len(s):>9}")
+        print(f"  {g:<16}{fmt(len(s), min_count):>9}")
     if readme is not None:
         base = readme.resolve().parent
         rel = {th: os.path.relpath(p.resolve(), base).replace(os.sep, "/") for th, p in paths.items()}
-        block = markdown(universe, groups, has_ehr, rel["light"], rel["dark"])
+        block = markdown(universe, groups, has_ehr, rel["light"], rel["dark"], min_count)
         if update_readme(readme, block):
             print(f"  updated the overview in {readme}")
         else:

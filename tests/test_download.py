@@ -130,11 +130,19 @@ def test_figure_and_readme_overview(full, tmp_path):
     assert "old" not in md and md.endswith("after\n")
     assert 'srcset="docs/modality-overview-dark.svg"' in md
     for line in ("| EHR (hosp, ICU) | 20 |", "| Notes | 20 |", "| ECG | 16 |", "| ED stay | 9 |",
-                 "| Chest X-ray | 12 |", "| Echo | 8 |", "| ICU waveforms | 3 |"):
+                 "| Chest X-ray | 12 |", "| Echo | 8 |", "| ICU waveforms | <5 |"):   # 3 is below 5
         assert line in md
-    assert "3 of 20 patients have every modality above" in md
+    assert "<5 of 20 patients have every modality above" in md
+    assert "Counts below 5 are shown as <5" in md and "<5" in text
     blob = md + text + "".join(p.read_text() for p in svgs)
     assert not any(s in blob for s in mp.DEMO + mp.OTHER)
+    assert ">other<" in svgs[0].read_text()                                # small combinations merged
+    # --min-count 1 shows every count
+    code, text = run("figure", "--out", str(out), "--to", str(tmp_path / "docs"), "--readme", str(readme),
+                     "--min-count", "1")
+    md = readme.read_text()
+    assert code == 0 and "| ICU waveforms | 3 |" in md and "3 of 20 patients have every modality" in md
+    assert "<1" not in md + text
 
 
 def test_rerun_fetches_nothing(full):
@@ -226,6 +234,15 @@ def test_local_waveform_copy_without_checksums(server, tmp_path):
     assert code == 0, text
     heas = list((out / "mimic4wdb/0.1.0/waves").rglob("*.hea"))
     assert len(heas) == len(facts["who"]["wdb"])
+
+
+def test_only_reports_the_sources_it_checked(tmp_path):
+    out = tmp_path / "o"
+    assert run("download", "--out", str(out), "--yes", "--only", "mimic-iv-demo", "mimic4wdb")[0] == 0
+    code, text = run("download", "--out", str(out), "--yes", "--only", "mimic-iv-ed-demo")
+    assert code == 0 and "EMPTY" not in text and "mimic4wdb" not in text.split("== File check")[1]
+    code, text = run("check", "--out", str(out))           # check covers every source in the manifest
+    assert code == 0 and "mimic4wdb" in text
 
 
 def test_plan_only_downloads_nothing(tmp_path):

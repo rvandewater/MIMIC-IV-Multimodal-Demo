@@ -129,6 +129,10 @@ download. Modalities are grouped:
 EHR is left out of the co-occurrence plot because every demo patient has it.
 The figure and table show patient counts only, never IDs.
 
+**Small counts are hidden.** A count below 5 is shown as `<5`, with no bar.
+Combinations with fewer than 5 patients are merged into one "other" column.
+Change the threshold with `--min-count N`; `--min-count 1` shows everything.
+
 ## Output layout
 
 ```
