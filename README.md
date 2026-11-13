@@ -1,4 +1,4 @@
-# mimic-demo-mm
+# MIMIC-IV Multimodal Demo
 
 [![tests](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/tests.yaml/badge.svg)](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/tests.yaml)
 [![build](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/python-build.yaml/badge.svg)](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/python-build.yaml)
