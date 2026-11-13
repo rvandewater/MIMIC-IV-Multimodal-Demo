@@ -1,5 +1,13 @@
 # mimic-demo-mm
 
+[![tests](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/tests.yaml/badge.svg)](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/tests.yaml)
+[![build](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/python-build.yaml/badge.svg)](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/python-build.yaml)
+[![live PhysioNet test](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/live.yaml/badge.svg)](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/live.yaml)
+[![PyPI](https://img.shields.io/pypi/v/mimic-demo-mm)](https://pypi.org/project/mimic-demo-mm/)
+![python](https://img.shields.io/badge/-Python_3.10--3.14-blue?logo=python&logoColor=white)
+[![data: PhysioNet](https://img.shields.io/badge/data-PhysioNet-blue)](https://physionet.org/)
+[![cite](https://img.shields.io/badge/cite-datasets-informational)](#citing)
+
 Assemble a **local multimodal MIMIC-IV demo**: the 100 patients of the open
 MIMIC-IV demo, gathered across every MIMIC module. One command downloads (or
 extracts from local copies), shows progress, and finishes with a file check
@@ -12,15 +20,15 @@ ends up on your disk.
 
 | source | access | what is fetched |
 |---|---|---|
-| `mimic-iv-demo` 2.2 | open | everything: structured, categorical and numeric EHR events |
-| `mimic-iv-ed-demo` 2.2 | open | everything: ED stays, triage, vitals |
-| `mimic-iv-ecg-demo` 0.1 | open | everything: 12-lead ECG waveforms |
-| `mimic-iv-ecg` 1.0 | open | tables only (machine measurements, ECG report text), demo patients' rows |
-| `mimic4wdb` 0.1.0 | open | demo patients' ICU bedside-monitor waveforms and numerics (WFDB records under `waves/`) |
-| `mimic-cxr-jpg` 2.1.0 | credentialed | demo patients' chest X-ray JPGs; metadata and label tables filtered to them |
-| `mimic-iv-echo` 1.0.1 | credentialed | demo patients' echo DICOMs; record list and measurements filtered to them |
-| `mimic-iv-note` 2.2 | credentialed | discharge summaries and radiology reports (plus detail tables), demo patients' rows |
-| `mimic-cxr` 2.0.0 | credentialed | optional (`--include mimic-cxr`): chest X-ray DICOMs and per-study report text |
+| [`mimic-iv-demo` 2.2](https://physionet.org/content/mimic-iv-demo/2.2/) | open | everything: structured, categorical and numeric EHR events |
+| [`mimic-iv-ed-demo` 2.2](https://physionet.org/content/mimic-iv-ed-demo/2.2/) | open | everything: ED stays, triage, vitals |
+| [`mimic-iv-ecg-demo` 0.1](https://physionet.org/content/mimic-iv-ecg-demo/0.1/) | open | everything: 12-lead ECG waveforms |
+| [`mimic-iv-ecg` 1.0](https://physionet.org/content/mimic-iv-ecg/1.0/) | open | tables only (machine measurements, ECG report text), demo patients' rows |
+| [`mimic4wdb` 0.1.0](https://physionet.org/content/mimic4wdb/0.1.0/) | open | demo patients' ICU bedside-monitor waveforms and numerics (WFDB records under `waves/`) |
+| [`mimic-cxr-jpg` 2.1.0](https://physionet.org/content/mimic-cxr-jpg/2.1.0/) | credentialed | demo patients' chest X-ray JPGs; metadata and label tables filtered to them |
+| [`mimic-iv-echo` 1.0.1](https://physionet.org/content/mimic-iv-echo/1.0.1/) | credentialed | demo patients' echo DICOMs; record list and measurements filtered to them |
+| [`mimic-iv-note` 2.2](https://physionet.org/content/mimic-iv-note/2.2/) | credentialed | discharge summaries and radiology reports (plus detail tables), demo patients' rows |
+| [`mimic-cxr` 2.0.0](https://physionet.org/content/mimic-cxr/2.0.0/) | credentialed | optional (`--include mimic-cxr`): chest X-ray DICOMs and per-study report text |
 
 The waveform database is an early pre-release with about 200 patients, so only
 a handful of the 100 demo patients (4 in 0.1.0, about 330 MB) have waveforms.
@@ -48,9 +56,13 @@ must have signed each project's data use agreement. Python 3.10 or later.
 With [uv](https://docs.astral.sh/uv/), no installation step is needed:
 
 ```bash
-uv run physionet login                 # once: sign in through your browser, no password stored
-uv run mimic-demo-mm download
+pip install mimic-demo-mm              # or "mimic-demo-mm[figure]" for the overview figure
+physionet login                        # once: sign in through your browser, no password stored
+mimic-demo-mm download
 ```
+
+Or, without installing anything: `uvx mimic-demo-mm download`. In a clone of this repository, use
+`uv run mimic-demo-mm ...`.
 
 The output goes to `./mimic-demo-multimodal`; change it with `--out DIR`.
 
@@ -245,7 +257,65 @@ tool's manifest, so it never touches a copy of PhysioNet made some other way.
     Use Agreement applies to the filtered tables and the manifest too.
   - **Don't upload it to online AI services.** See PhysioNet's guidance:
     https://physionet.org/news/post/llm-responsible-use/
-- Cite each project as its PhysioNet page asks.
+- **Cite every dataset you use:** see [Citing](#citing).
+
+## Citing
+
+Cite every dataset you use, as its PhysioNet page asks. The citations below are copied from those pages (retrieved 2026-11-13); check the page for the version you use.
+
+**PhysioNet** (every project page asks for this standard citation):
+
+- Pollard, T., Moody, B. E., Lehman, L., Gow, B., Fernandes, C., Xie, C., Johnson, A., Mark, R. G., & Heldt, T. (2026). PhysioNet as a global platform for biomedical research. Nature Health. <https://doi.org/10.1038/s44360-026-00096-z>. Available from: <https://pmc.ncbi.nlm.nih.gov/articles/PMC13641116/>
+
+**The datasets this tool downloads:**
+
+- **[MIMIC-IV Clinical Database Demo, version 2.2](https://physionet.org/content/mimic-iv-demo/2.2/)** (`mimic-iv-demo`)
+  - Johnson, A., Bulgarelli, L., Pollard, T., Horng, S., Celi, L. A., & Mark, R. (2023). MIMIC-IV Clinical Database Demo (version 2.2). PhysioNet. RRID:SCR_007345. <https://doi.org/10.13026/dp1f-ex47>
+  - Derived from [MIMIC-IV 1.0](https://physionet.org/content/mimiciv/1.0/): the page asks you to cite it too (see below).
+
+- **[MIMIC-IV-ED Demo, version 2.2](https://physionet.org/content/mimic-iv-ed-demo/2.2/)** (`mimic-iv-ed-demo`)
+  - Johnson, A., Bulgarelli, L., Pollard, T., Celi, L. A., Horng, S., & Mark, R. (2023). MIMIC-IV-ED Demo (version 2.2). PhysioNet. RRID:SCR_007345. <https://doi.org/10.13026/jzz5-vs76>
+  - Derived from [MIMIC-IV-ED 2.2](https://physionet.org/content/mimic-iv-ed/2.2/): the page asks you to cite it too (see below).
+
+- **[MIMIC-IV-ECG Demo - Diagnostic Electrocardiogram Matched Subset Demo, version 0.1](https://physionet.org/content/mimic-iv-ecg-demo/0.1/)** (`mimic-iv-ecg-demo`)
+  - Gow, B., Pollard, T., Nathanson, L. A., Moody, B., Johnson, A., Moukheiber, D., Greenbaum, N., Berkowitz, S., Eslami, P., Herbst, E., Mark, R., & Horng, S. (2022). MIMIC-IV-ECG Demo - Diagnostic Electrocardiogram Matched Subset Demo (version 0.1). PhysioNet. RRID:SCR_007345. <https://doi.org/10.13026/4eqn-kt76>
+  - Derived from [MIMIC-IV 2.0](https://physionet.org/content/mimiciv/2.0/), [MIMIC-IV Clinical Database Demo 1.0](https://physionet.org/content/mimic-iv-demo/1.0/): the page asks you to cite them too (see below).
+
+- **[MIMIC-IV-ECG: Diagnostic Electrocardiogram Matched Subset, version 1.0](https://physionet.org/content/mimic-iv-ecg/1.0/)** (`mimic-iv-ecg`)
+  - Gow, B., Pollard, T., Nathanson, L. A., Johnson, A., Moody, B., Fernandes, C., Greenbaum, N., Waks, J. W., Eslami, P., Carbonati, T., Chaudhari, A., Herbst, E., Moukheiber, D., Berkowitz, S., Mark, R., & Horng, S. (2023). MIMIC-IV-ECG: Diagnostic Electrocardiogram Matched Subset (version 1.0). PhysioNet. RRID:SCR_007345. <https://doi.org/10.13026/4nqg-sb35>
+  - Derived from [MIMIC-IV 2.2](https://physionet.org/content/mimiciv/2.2/): the page asks you to cite it too (see below).
+
+- **[MIMIC-IV Waveform Database, version 0.1.0](https://physionet.org/content/mimic4wdb/0.1.0/)** (`mimic4wdb`)
+  - Moody, B., Hao, S., Gow, B., Pollard, T., Zong, W., & Mark, R. (2022). MIMIC-IV Waveform Database (version 0.1.0). PhysioNet. RRID:SCR_007345. <https://doi.org/10.13026/a2mw-f949>
+  - Derived from [MIMIC-IV 2.0](https://physionet.org/content/mimiciv/2.0/): the page asks you to cite it too (see below).
+
+- **[MIMIC-CXR-JPG - chest radiographs with structured labels, version 2.1.0](https://physionet.org/content/mimic-cxr-jpg/2.1.0/)** (`mimic-cxr-jpg`)
+  - Johnson, A., Lungren, M., Peng, Y., Lu, Z., Mark, R., Berkowitz, S., & Horng, S. (2024). MIMIC-CXR-JPG - chest radiographs with structured labels (version 2.1.0). PhysioNet. RRID:SCR_007345. <https://doi.org/10.13026/jsn5-t979>
+  - Original publication, which the page also asks you to cite: Johnson AE, Pollard TJ, Berkowitz S, Greenbaum NR, Lungren MP, Deng CY, Mark RG, Horng S. MIMIC-CXR: A large publicly available database of labeled chest radiographs. arXiv preprint arXiv:1901.07042. 2019 Jan 21. <https://arxiv.org/abs/1901.07042>
+  - Derived from [MIMIC-CXR Database 2.0.0](https://physionet.org/content/mimic-cxr/2.0.0/): the page asks you to cite it too (see below).
+
+- **[MIMIC-IV-Echo: Echocardiogram Matched Subset, version 1.0.1](https://physionet.org/content/mimic-iv-echo/1.0.1/)** (`mimic-iv-echo`)
+  - Gow, B., Pollard, T., Greenbaum, N., Moody, B., Han, A., Waks, J. W., Johnson, A., Herbst, E., Eslami, P., Chaudhari, A., Carbonati, T., Berkowitz, S., Mark, R., & Horng, S. (2026). MIMIC-IV-Echo: Echocardiogram Matched Subset (version 1.0.1). PhysioNet. RRID:SCR_007345. <https://doi.org/10.13026/307c-mr50>
+  - Derived from [MIMIC-IV 2.2](https://physionet.org/content/mimiciv/2.2/), [MIMIC-IV 3.1](https://physionet.org/content/mimiciv/3.1/): the page asks you to cite them too (see below).
+
+- **[MIMIC-IV-Note: Deidentified free-text clinical notes, version 2.2](https://physionet.org/content/mimic-iv-note/2.2/)** (`mimic-iv-note`)
+  - Johnson, A., Pollard, T., Horng, S., Celi, L. A., & Mark, R. (2023). MIMIC-IV-Note: Deidentified free-text clinical notes (version 2.2). PhysioNet. RRID:SCR_007345. <https://doi.org/10.13026/1n74-ne17>
+
+- **[MIMIC-CXR Database, version 2.0.0](https://physionet.org/content/mimic-cxr/2.0.0/)** (`mimic-cxr`)
+  - Johnson, A., Pollard, T., Mark, R., Berkowitz, S., & Horng, S. (2019). MIMIC-CXR Database (version 2.0.0). PhysioNet. RRID:SCR_007345. <https://doi.org/10.13026/C2JT1Q>
+  - Original publication, which the page also asks you to cite: Johnson, A.E.W., Pollard, T.J., Berkowitz, S.J. et al. MIMIC-CXR, a de-identified publicly available database of chest radiographs with free-text reports. Sci Data 6, 317 (2019). <https://doi.org/10.1038/s41597-019-0322-0>
+
+**Projects the datasets above were derived from** (their pages list them under "Parent Projects", with "Please cite them when using this project"):
+
+- **[MIMIC-CXR Database, version 2.0.0](https://physionet.org/content/mimic-cxr/2.0.0/)**: listed above.
+- **[MIMIC-IV Clinical Database Demo, version 1.0](https://physionet.org/content/mimic-iv-demo/1.0/)**: Johnson, A., Bulgarelli, L., Pollard, T., Horng, S., Celi, L. A., & Mark, R. (2022). MIMIC-IV Clinical Database Demo (version 1.0). PhysioNet. RRID:SCR_007345. <https://doi.org/10.13026/jwtp-v091>
+- **[MIMIC-IV-ED, version 2.2](https://physionet.org/content/mimic-iv-ed/2.2/)**: Johnson, A., Bulgarelli, L., Pollard, T., Celi, L. A., Mark, R., & Horng, S. (2023). MIMIC-IV-ED (version 2.2). PhysioNet. RRID:SCR_007345. <https://doi.org/10.13026/5ntk-km72>
+- **[MIMIC-IV, version 1.0](https://physionet.org/content/mimiciv/1.0/)**: Johnson, A., Bulgarelli, L., Pollard, T., Horng, S., Celi, L. A., & Mark, R. (2021). MIMIC-IV (version 1.0). PhysioNet. RRID:SCR_007345. <https://doi.org/10.13026/s6n6-xd98>
+- **[MIMIC-IV, version 2.0](https://physionet.org/content/mimiciv/2.0/)**: Johnson, A., Bulgarelli, L., Pollard, T., Horng, S., Celi, L. A., & Mark, R. (2022). MIMIC-IV (version 2.0). PhysioNet. RRID:SCR_007345. <https://doi.org/10.13026/7vcr-e114>
+- **[MIMIC-IV, version 2.2](https://physionet.org/content/mimiciv/2.2/)**: Johnson, A., Bulgarelli, L., Pollard, T., Horng, S., Celi, L. A., & Mark, R. (2023). MIMIC-IV (version 2.2). PhysioNet. RRID:SCR_007345. <https://doi.org/10.13026/6mm1-ek67>
+  - Original publication, which the page also asks you to cite: Johnson, A.E.W., Bulgarelli, L., Shen, L. et al. MIMIC-IV, a freely accessible electronic health record dataset. Sci Data 10, 1 (2023). <https://doi.org/10.1038/s41597-022-01899-x>
+- **[MIMIC-IV, version 3.1](https://physionet.org/content/mimiciv/3.1/)**: Johnson, A., Bulgarelli, L., Pollard, T., Gow, B., Moody, B., Horng, S., Celi, L. A., & Mark, R. (2024). MIMIC-IV (version 3.1). PhysioNet. RRID:SCR_007345. <https://doi.org/10.13026/kpb9-mt58>
+  - Original publication, which the page also asks you to cite: Johnson, A.E.W., Bulgarelli, L., Shen, L. et al. MIMIC-IV, a freely accessible electronic health record dataset. Sci Data 10, 1 (2023). <https://doi.org/10.1038/s41597-022-01899-x>
 
 ## Development
 
@@ -263,6 +333,11 @@ from it. It reproduces:
 - a project without checksums;
 - a file whose connection drops halfway.
 
+**Releasing.** Push a tag such as `v0.2.0`. The `python-build.yaml` workflow
+builds the package on every push. For a tag, it also publishes to PyPI through
+trusted publishing, signs the files with Sigstore, and creates a GitHub release.
+The version comes from the tag (hatch-vcs).
+
 **Live test.** `tests/test_live.py` runs against the real PhysioNet and uses
 about 2 MB. It takes one to two minutes, mostly spent reading the waveform
 checksum list. It is off by default:
@@ -275,3 +350,7 @@ It downloads the MIMIC-IV-ED demo (about 120 KB) through `physionet.download`,
 checks it, confirms a second run fetches nothing, and draws the figure. It also
 plans one waveform patient without downloading their files. With a PhysioNet
 sign-in it also plans MIMIC-IV-Note, reading only each table's header.
+
+The `live.yaml` workflow runs it weekly and on demand, with open data only.
+Never give that workflow a PhysioNet sign-in: credentialed data must not be
+downloaded to GitHub's machines.

@@ -994,7 +994,6 @@ wheels = [
 
 [[package]]
 name = "mimic-demo-mm"
-version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "physionet" },
@@ -1022,7 +1021,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.28" },
     { name = "tqdm", specifier = ">=4.60" },
 ]
-provides-extras = ["test", "figure"]
+provides-extras = ["figure", "test"]
 
 [[package]]
 name = "numpy"

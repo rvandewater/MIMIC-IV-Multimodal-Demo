@@ -1,2 +1,7 @@
 """Download the MIMIC-IV demo patients across modalities from PhysioNet."""
-__version__ = "0.2.0"
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("mimic-demo-mm")   # set from the git tag when the package is built
+except PackageNotFoundError:
+    __version__ = "0.0.0"
