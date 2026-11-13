@@ -121,7 +121,7 @@ uv run mimic-demo-mm sources                                  # list them
 uv run mimic-demo-mm download --only mimic-iv-demo mimic-cxr-jpg
 uv run mimic-demo-mm download --skip mimic-iv-echo
 uv run mimic-demo-mm download --include mimic-cxr             # add the DICOM release
-uv run mimic-demo-mm download --subjects 10000032 10000084     # only these demo patients
+uv run mimic-demo-mm download --subjects 10000032 10039708     # only these demo patients
 ```
 
 `--subjects` limits the per-patient files and filtered tables to the patients
