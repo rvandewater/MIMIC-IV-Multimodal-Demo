@@ -35,7 +35,18 @@ class Source:
         return f"{self.files_dir}/p{subject[:self.group_digits]}/p{subject}/"
 
     @property
+    def remote(self) -> str:
+        """Path on PhysioNet's file server: files/<slug>/<version>/."""
+        return f"{self.slug}/{self.version}"
+
+    @property
     def rel(self) -> str:
+        """Local folder, as physionet.download() names it: <slug>-<version>/."""
+        return f"{self.slug}-{self.version}"
+
+    @property
+    def old_rel(self) -> str:
+        """Local folder used before the switch to the physionet package."""
         return f"{self.slug}/{self.version}"
 
     @property
@@ -66,7 +77,7 @@ SOURCES: list[Source] = [
 ]
 
 BY_KEY = {s.key: s for s in SOURCES}
-DEMO_IDS = ("mimic-iv-demo/2.2", "demo_subject_id.csv")
+DEMO_IDS = "demo_subject_id.csv"   # in mimic-iv-demo
 
 
 def select(only=None, skip=None, include=None) -> list[Source]:

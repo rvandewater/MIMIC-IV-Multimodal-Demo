@@ -1,7 +1,16 @@
-"""Plan and run the download (from PhysioNet or from local copies)."""
+"""Plan and run the download (from PhysioNet or from local copies).
+
+Whole files from PhysioNet are downloaded by the official ``physionet`` package
+(``physionet.download``: resume, retries, checksums, and the AWS open-data
+mirror). This module plans what to fetch, streams and filters the large tables
+(the package has no way to keep only some rows without storing the whole
+table), and handles local copies and projects without a checksum list.
+"""
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import os
 import re
 import shutil
 import sys
@@ -12,11 +21,11 @@ from pathlib import Path
 from tqdm import tqdm
 
 from .http import Client, NotFound, PhysioNetError
-from .listing import is_table
+from .listing import SUBJECT_DIR, is_table
 from .manifest import Item, Manifest
 from .origins import LocalOrigin, RemoteOrigin, same_file
-from .sources import BY_KEY, DEMO_IDS, Source
-from .tables import NoSubjectColumn, filter_stream, sha256_file
+from .sources import BY_KEY, DEMO_IDS, SOURCES, Source
+from .tables import NoSubjectColumn, filter_stream, has_subject_column, sha256_file
 
 SMALL_FILE = 10 * 2 ** 20      # other top-level files (LICENSE, README...) kept if at most this big
 WHOLE_TABLE = 200 * 2 ** 20    # tables without subject_id kept whole if at most this big
@@ -40,12 +49,48 @@ def local_path(root: Path, item: Item) -> Path:
     return root / BY_KEY[item.source].rel / item.path
 
 
+def old_layout(root: Path) -> list[Source]:
+    """Sources still stored in the <slug>/<version>/ layout of mimic-demo-mm 0.1, in a
+    folder this tool made (it has the manifest): never someone else's copy of PhysioNet."""
+    from .manifest import NAME
+    if not (root / NAME).exists():
+        return []
+    return [s for s in SOURCES if (root / s.old_rel).is_dir() and not (root / s.rel).exists()]
+
+
+def require_current_layout(root: Path) -> None:
+    """Stop, without touching anything, if the folder still uses the old layout."""
+    old = old_layout(root)
+    if old:
+        names = ", ".join(f"{s.old_rel}/ -> {s.rel}/" for s in old)
+        raise SystemExit(
+            f"x {root} uses the folder layout of mimic-demo-mm 0.1 ({names}).\n"
+            "  Data is now saved as <project>-<version>/, the layout of the physionet package.\n"
+            f"  Rename the folders with:  mimic-demo-mm migrate --out {root}\n"
+            "  (add --dry-run to see what changes; update any code that reads the old paths).")
+
+
+def migrate_layout(root: Path, dry_run: bool = False) -> int:
+    """Rename <slug>/<version>/ to <slug>-<version>/. Nothing inside the folders
+    changes: the manifest stores paths relative to each project folder."""
+    old = old_layout(root)
+    for s in old:
+        print(f"  {'would move' if dry_run else 'moved'} {s.old_rel}/ -> {s.rel}/")
+        if not dry_run:
+            (root / s.old_rel).rename(root / s.rel)
+            with contextlib.suppress(OSError):
+                (root / s.old_rel).parent.rmdir()   # only if now empty
+    if not old:
+        print("  nothing to move: every project folder already uses <project>-<version>/")
+    return len(old)
+
+
 def make_origins(sources: list[Source], client: Client, local: dict[str, Path], link: str, root: Path) -> dict:
     origins = {}
     for s in sources:
         if s.key in local:
             o = LocalOrigin(s, local[s.key], link)
-            if o.dir == (root / s.rel).resolve():
+            if o.dir in ((root / s.rel).resolve(), (root / s.old_rel).resolve()):
                 raise SystemExit(f"--local {s.key} points at the output folder itself; choose a different --out")
             origins[s.key] = o
         else:
@@ -55,12 +100,13 @@ def make_origins(sources: list[Source], client: Client, local: dict[str, Path], 
 
 # ---------------------------------------------------------------- demo IDs
 def demo_ids(client: Client, root: Path, local: dict[str, Path]) -> set[str]:
-    candidates = [root / DEMO_IDS[0] / DEMO_IDS[1]]
-    if "mimic-iv-demo" in local:
-        d = Path(local["mimic-iv-demo"]).expanduser()
-        candidates += [d / DEMO_IDS[1], d / "2.2" / DEMO_IDS[1]]
+    src = BY_KEY["mimic-iv-demo"]
+    candidates = [root / src.rel / DEMO_IDS]
+    if src.key in local:
+        d = Path(local[src.key]).expanduser()
+        candidates += [d / DEMO_IDS, d / src.version / DEMO_IDS]
     p = next((c for c in candidates if c.exists()), None)
-    text = p.read_text() if p else client.request("GET", f"{DEMO_IDS[0]}/{DEMO_IDS[1]}", auth=False).text
+    text = p.read_text() if p else client.request("GET", f"{src.remote}/{DEMO_IDS}", auth=False).text
     ids = set(re.findall(r"\b\d{8}\b", text))
     if not ids:
         raise SystemExit("could not read the demo patient IDs")
@@ -96,12 +142,38 @@ def plan(origins: dict, sources: list[Source], ids: set[str], man: Manifest, job
                 except (PhysioNetError, OSError):
                     pass
                 b.update()
+    # Tables without a subject_id column (data dictionaries, study lists) are kept whole:
+    # look at each pending table's header now, so they download with the other files.
+    probe = [i for i in items if i.kind == "table" and i.status != "done"]
+    if probe:
+        with bar(total=len(probe), desc="  reading table headers", unit="table", leave=False) as b, \
+                ThreadPoolExecutor(max(jobs, 4)) as ex:
+            futs = {ex.submit(_has_subjects, origins[i.source], i.path): i for i in probe}
+            for f in as_completed(futs):
+                it = futs[f]
+                try:
+                    keep_rows = f.result()
+                except (PhysioNetError, OSError, EOFError):
+                    keep_rows = True   # find out while streaming
+                if not keep_rows:
+                    it.kind = "file"
+                    if (it.size or 0) > WHOLE_TABLE:
+                        it.status, it.note = "skipped", "large table without a subject_id column"
+                b.update()
     for it in items:  # other large top-level files are not needed (e.g. IMAGE_FILENAMES, report zips)
         src = BY_KEY[it.source]
         if src.mode != "full" and it.kind == "file" and not src.in_files(it.path) \
-                and (it.size or 0) > SMALL_FILE:
+                and (it.size or 0) > SMALL_FILE and not is_table(it.path, src):
             it.status, it.note = "skipped", "large top-level file, not needed for the demo patients"
     return items
+
+
+def _has_subjects(origin, path: str) -> bool:
+    read, close = origin.open_raw(path)
+    try:
+        return has_subject_column(read, path)
+    finally:
+        close()
 
 
 def on_disk(root: Path, it: Item) -> bool:
@@ -119,11 +191,91 @@ class _NullBar:
         pass
 
 
+def _glob_literal(path: str) -> str:
+    return re.sub(r"([*?\[])", r"[\1]", path)
+
+
+def include_patterns(items: list[Item]) -> list[str]:
+    """physionet.download() include patterns: one per patient folder (a handful of
+    patterns, fast to match against checksum lists with 100,000s of entries), plus
+    the exact path of every other file."""
+    out = set()
+    for it in items:
+        m = SUBJECT_DIR.search(it.path)
+        out.add(_glob_literal(it.path[:m.end()]) + "*" if m else _glob_literal(it.path))
+    return sorted(out)
+
+
 class Runner:
-    def __init__(self, origins: dict, root: Path, man: Manifest, ids: set[str], jobs: int):
+    def __init__(self, origins: dict, root: Path, man: Manifest, ids: set[str], jobs: int,
+                 client: Client | None = None, source: str = "auto"):
         self.origins, self.root, self.man, self.ids, self.jobs = origins, root, man, ids, jobs
+        self.client, self.source = client, source
         self.stop = threading.Event()
         self.lock = threading.Lock()
+
+    def bulk(self, src: Source) -> bool:
+        """Whether physionet.download() fetches this source's files: from PhysioNet, with a checksum list."""
+        return isinstance(self.origins[src.key], RemoteOrigin) and \
+            self.man.sources.get(src.key, {}).get("listing") == "SHA256SUMS.txt"
+
+    def fetch_with_physionet(self, src: Source, items: list[Item], total_bar) -> None:
+        """Download a source's files with physionet.download(). Its own output
+        (which names every file, so patient IDs) is silenced; progress is measured
+        on disk and shown in the tool's counts-only bar."""
+        import physionet
+        from physionet.api.exceptions import PhysioNetAPIError
+        from physionet.download import DownloadError
+
+        dests = [(it, local_path(self.root, it)) for it in items]
+
+        def size(p):
+            try:
+                return p.stat().st_size
+            except OSError:   # not there yet, or removed after a failed checksum
+                return 0
+
+        def on_disk_bytes():
+            return sum(min(size(p), it.size or 1 << 62) for it, p in dests)
+
+        shown = [on_disk_bytes()]
+        self._bump(total_bar, shown[0])
+        done = threading.Event()
+
+        def poll():
+            while not done.wait(0.5):
+                now = on_disk_bytes()
+                self._bump(total_bar, now - shown[0])
+                shown[0] = now
+
+        watcher = threading.Thread(target=poll, daemon=True)
+        watcher.start()
+        try:
+            for attempt in range(3):   # each attempt resumes cut-off files
+                try:
+                    with open(os.devnull, "w") as sink, contextlib.redirect_stdout(sink), \
+                            contextlib.redirect_stderr(sink):
+                        physionet.download(src.slug, src.version, output_dir=str(self.root),
+                                           include=include_patterns(items), source=self.source,
+                                           base_url=self.client.base_url, retries=3,
+                                           **self.client.credentials)
+                    break
+                except DownloadError as e:
+                    note = f"physionet.download: {len(e.failures)} file(s) failed, retried"
+                    for it, _ in dests:
+                        it.note = note
+                except PhysioNetAPIError as e:
+                    raise PhysioNetError(f"{src.key}: {type(e).__name__}") from None
+        finally:
+            done.set()
+            watcher.join()
+            now = on_disk_bytes()
+            self._bump(total_bar, now - shown[0])
+        for it, p in dests:   # the package verified every checksum; confirm the result is on disk
+            if p.exists() and (it.size is None or p.stat().st_size == it.size):
+                it.status, it.note = "done", ""
+            else:
+                it.status, it.note = "failed", "could not download a complete, matching copy"
 
     def _bump(self, b, n):
         with self.lock:
@@ -232,14 +384,26 @@ class Runner:
     def run(self, files: list[Item], tables: list[Item]) -> None:
         try:
             if files:
+                by_pkg = [i for i in files if self.bulk(BY_KEY[i.source])]
+                rest = [i for i in files if not self.bulk(BY_KEY[i.source])]
                 with bar(total=sum(i.size or 0 for i in files), unit="B", unit_scale=True,
-                         desc="  files") as tb, ThreadPoolExecutor(self.jobs) as ex:
-                    futs = [ex.submit(self._safe, self.fetch_file, it, tb) for it in files]
-                    for n, f in enumerate(as_completed(futs), 1):
-                        f.result()
-                        tb.set_postfix_str(f"{n:,}/{len(files):,} files")
-                        if n % 50 == 0:
-                            self.man.save()
+                         desc="  files") as tb:
+                    for key in dict.fromkeys(i.source for i in by_pkg):
+                        its = [i for i in by_pkg if i.source == key]
+                        tb.set_postfix_str(f"{key} ({len(its):,} files, physionet package)")
+                        try:
+                            self.fetch_with_physionet(BY_KEY[key], its, tb)
+                        except PhysioNetError as e:
+                            for it in its:
+                                it.status, it.note = "failed", str(e)
+                        self.man.save()
+                    with ThreadPoolExecutor(self.jobs) as ex:
+                        futs = [ex.submit(self._safe, self.fetch_file, it, tb) for it in rest]
+                        for n, f in enumerate(as_completed(futs), 1):
+                            f.result()
+                            tb.set_postfix_str(f"{n:,}/{len(rest):,} files")
+                            if n % 50 == 0:
+                                self.man.save()
             for it in tables:
                 self._safe(self.fetch_table, it)
                 self.man.save()

@@ -44,6 +44,23 @@ def sha256_file(path: Path, chunk: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
+def has_subject_column(read, path: str) -> bool:
+    """Read just enough of table ``path`` (through ``read(n)``) to see its header."""
+    raw = io.BufferedReader(_Counting(read, None, _NEVER), buffer_size=1 << 16)
+    text = io.TextIOWrapper(gzip.GzipFile(fileobj=raw) if path.endswith(".gz") else raw,
+                            encoding="utf-8", errors="replace", newline="")
+    header = next(csv.reader(text), [])
+    return "subject_id" in [h.strip().lower() for h in header]
+
+
+class _Never:
+    def is_set(self):
+        return False
+
+
+_NEVER = _Never()
+
+
 def filter_stream(read, path: str, dest: Path, ids: set[str], bar, stop) -> dict:
     """Read the bytes of table ``path`` through ``read(n)`` (from PhysioNet or a
     local copy) and write the rows whose subject_id is in ``ids`` to ``dest``

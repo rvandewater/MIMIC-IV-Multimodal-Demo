@@ -23,12 +23,12 @@ class RemoteOrigin:
         return list_files(self.client, self.src, ids)
 
     def size(self, path: str) -> int | None:
-        return self.client.head_size(f"{self.src.rel}/{path}", self.src.credentialed)
+        return self.client.head_size(f"{self.src.remote}/{path}", self.src.credentialed)
 
     def blocks(self, path: str, start: int) -> tuple[Iterator[bytes], bool, Callable]:
         """-> (byte blocks from ``start``, whether the server restarted from 0, close)."""
         headers = {"Range": f"bytes={start}-"} if start else {}
-        r = self.client.request("GET", f"{self.src.rel}/{path}", auth=self.src.credentialed,
+        r = self.client.request("GET", f"{self.src.remote}/{path}", auth=self.src.credentialed,
                                 stream=True, headers=headers)
         if r.status_code == 416:
             r.close()
@@ -37,7 +37,7 @@ class RemoteOrigin:
         return r.raw.stream(CHUNK, decode_content=False), restarted, r.close
 
     def open_raw(self, path: str) -> tuple[Callable[[int], bytes], Callable]:
-        r = self.client.request("GET", f"{self.src.rel}/{path}", auth=self.src.credentialed, stream=True)
+        r = self.client.request("GET", f"{self.src.remote}/{path}", auth=self.src.credentialed, stream=True)
         enc = r.headers.get("Content-Encoding", "").lower()
         decode = enc in ("gzip", "deflate") and not path.endswith(".gz")
         return (lambda n: r.raw.read(n, decode_content=decode)), r.close
@@ -52,8 +52,11 @@ class LocalOrigin:
         folder = Path(folder).expanduser().resolve()
         if not folder.is_dir():
             raise SystemExit(f"--local {src.key}: {folder} is not a folder")
-        if (folder / src.version).is_dir() and not (folder / "SHA256SUMS.txt").exists():
-            folder = folder / src.version   # accept the project folder as well as the version folder
+        if not (folder / "SHA256SUMS.txt").exists():   # accept a parent folder as well as the version folder
+            for sub in (src.version, src.rel):
+                if (folder / sub).is_dir():
+                    folder = folder / sub
+                    break
         self.dir = folder
 
     def describe(self) -> str:
