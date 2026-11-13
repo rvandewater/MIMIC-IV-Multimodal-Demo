@@ -1,12 +1,12 @@
-"""mimic-demo-mm: assemble a local multimodal MIMIC-IV demo.
+"""Multi-MIMIC: assemble a local multimodal MIMIC-IV demo.
 
-  mimic-demo-mm sources                         list the datasets
-  mimic-demo-mm download --user NAME            download everything (asks for the password)
-  mimic-demo-mm download --local mimic-iv-note=/data/mimic-iv-note/2.2 ...
+  multi-mimic sources                         list the datasets
+  multi-mimic download --user NAME            download everything (asks for the password)
+  multi-mimic download --local mimic-iv-note=/data/mimic-iv-note/2.2 ...
                                                 take subsets from local copies instead
-  mimic-demo-mm check [--fix]                   verify every file; re-fetch broken ones
-  mimic-demo-mm figure [--readme README.md]     draw the modality coverage / co-occurrence overview
-  mimic-demo-mm migrate [--dry-run]             rename folders from the 0.1 layout
+  multi-mimic check [--fix]                   verify every file; re-fetch broken ones
+  multi-mimic figure [--readme README.md]     draw the modality coverage / co-occurrence overview
+  multi-mimic migrate [--dry-run]             rename folders from the mimic-demo-mm layout
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from .check import report, verify
 from .download import (Runner, demo_ids, make_origins, migrate_layout, plan, require_current_layout,
                        summarize_plan)
 from .http import DEFAULT_BASE_URL, Client, PhysioNetError, base_url
-from .manifest import Manifest
+from .manifest import Manifest, manifest_file
 from .sources import BY_KEY, SOURCES, select
 
 
@@ -34,7 +34,7 @@ def _local_map(pairs: list[str] | None, man: Manifest | None = None) -> dict[str
             raise SystemExit(f"--local expects SOURCE=FOLDER, got '{p}'")
         k, d = p.split("=", 1)
         if k not in BY_KEY:
-            raise SystemExit(f"--local: unknown source '{k}'. See: mimic-demo-mm sources")
+            raise SystemExit(f"--local: unknown source '{k}'. See: multi-mimic sources")
         out[k] = Path(d)
     return out
 
@@ -83,7 +83,7 @@ def _download(root: Path, sources, local, link, user, jobs, yes, plan_only, quic
             raise SystemExit(f"--subjects: {len(unknown)} ID(s) are not MIMIC-IV demo patients")
         ids = set(subjects)
     man.demo_subjects = len(ids)
-    print(f"mimic-demo-mm {__version__}: {len(ids)} demo patients -> {root}\n\nListing files")
+    print(f"Multi-MIMIC {__version__}: {len(ids)} demo patients -> {root}\n\nListing files")
     items = plan(origins, sources, ids, man, jobs)
     files, tables, store, free = summarize_plan(root, sources, items, origins)
     man.save()
@@ -118,7 +118,7 @@ def cmd_check(a) -> int:
     require_current_layout(root)
     man = Manifest.load(root)
     if not man.items:
-        print(f"No manifest in {root}. Run `mimic-demo-mm download` first (or pass --out).")
+        print(f"No manifest in {root}. Run `multi-mimic download` first (or pass --out).")
         return 2
     res = verify(root, man, None, a.quick)
     ok = report(root, man, res, a.quick)
@@ -139,8 +139,8 @@ def cmd_check(a) -> int:
 
 def cmd_migrate(a) -> int:
     root = Path(a.out).resolve()
-    if not (root / "mimic-demo-mm.manifest.json").exists():
-        print(f"x {root} has no mimic-demo-mm manifest: not a folder this tool made, nothing changed")
+    if manifest_file(root) is None:
+        print(f"x {root} has no Multi-MIMIC manifest: not a folder this tool made, nothing changed")
         return 2
     migrate_layout(root, a.dry_run)
     return 0
@@ -150,7 +150,7 @@ def cmd_figure(a) -> int:
     try:
         import matplotlib  # noqa: F401
     except ImportError:
-        print("x the figure needs matplotlib: run `uv run --extra figure mimic-demo-mm figure ...`")
+        print("x the figure needs matplotlib: run `uv run --extra figure multi-mimic figure ...`")
         return 2
     from .figure import run
     if a.min_count < 1:
@@ -160,7 +160,7 @@ def cmd_figure(a) -> int:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(prog="mimic-demo-mm", description=__doc__,
+    ap = argparse.ArgumentParser(prog="multi-mimic", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version", version=__version__)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -200,7 +200,7 @@ def main(argv=None) -> int:
     c.add_argument("--fix", action="store_true", help="re-fetch missing, partial or corrupt files")
     c.set_defaults(fn=cmd_check)
 
-    m = sub.add_parser("migrate", help="rename folders from the 0.1 layout (<project>/<version>/) "
+    m = sub.add_parser("migrate", help="rename folders from the mimic-demo-mm layout (<project>/<version>/) "
                                        "to <project>-<version>/")
     m.add_argument("--out", default="mimic-demo-multimodal", help="data folder (default: %(default)s)")
     m.add_argument("--dry-run", action="store_true", help="only show what would be renamed")

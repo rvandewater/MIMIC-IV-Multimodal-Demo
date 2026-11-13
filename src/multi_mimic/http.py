@@ -62,7 +62,7 @@ class Client:
         if c is None:   # one client per thread: requests sessions are not shared across threads
             c = PhysioNetClient(base_url=self.base_url, username=self.user, password=self.password,
                                 token=self.token, timeout=int(self.timeout))
-            c.session.headers["User-Agent"] = f"mimic-demo-mm/{__version__} ({c.session.headers['User-Agent']})"
+            c.session.headers["User-Agent"] = f"multi-mimic/{__version__} ({c.session.headers['User-Agent']})"
             c.session.headers["Accept"] = "*/*"
             self._local.c = c
         return c

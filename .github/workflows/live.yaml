@@ -25,5 +25,5 @@ jobs:
 
       - name: Run the live test
         env:
-          MIMIC_DEMO_MM_LIVE: "1"
+          MULTI_MIMIC_LIVE: "1"
         run: uv run --extra test pytest tests/test_live.py -v

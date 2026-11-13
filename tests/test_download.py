@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 import mock_physionet as mp
-from mimic_demo_mm.cli import main
-from mimic_demo_mm.manifest import NAME
+from multi_mimic.cli import main
+from multi_mimic.manifest import LEGACY_NAME, NAME
 
 
 @pytest.fixture(scope="module")
@@ -171,7 +171,7 @@ def test_check_detects_and_fixes(full):
     note.write_bytes(note.read_bytes()[:-10])            # truncated table
     code, text = run("check", "--out", str(out))
     assert code == 1 and "INCOMPLETE: 4 problem file(s)" in text
-    assert (out / "mimic-demo-mm.check-report.txt").exists()
+    assert (out / "multi-mimic.check-report.txt").exists()
     code, text = run("check", "--out", str(out), "--fix")
     assert code == 0, text
     code, text = run("check", "--out", str(out))
@@ -252,16 +252,18 @@ def test_old_layout_is_only_renamed_on_request(full):
     out, _, _ = full
     new, old = out / "mimic-iv-ed-demo-2.2", out / "mimic-iv-ed-demo/2.2"
     old.parent.mkdir()
-    new.rename(old)                                        # as mimic-demo-mm 0.1 left it
+    new.rename(old)                                        # as mimic-demo-mm left it,
+    (out / NAME).rename(out / LEGACY_NAME)                 # under the tool's old name
     for cmd in (["download", "--yes"], ["check"], ["figure", "--to", str(out / "docs")]):
         code, text = run(*cmd, "--out", str(out))
-        assert code == 2 and "mimic-demo-mm migrate" in text and old.is_dir() and not new.exists()
+        assert code == 2 and "multi-mimic migrate" in text and old.is_dir() and not new.exists()
     code, text = run("migrate", "--out", str(out), "--dry-run")
     assert code == 0 and "would move mimic-iv-ed-demo/2.2/ -> mimic-iv-ed-demo-2.2/" in text and old.is_dir()
     code, text = run("migrate", "--out", str(out))
     assert code == 0 and new.is_dir() and not old.parent.exists()
     code, text = run("download", "--out", str(out), "--yes")
     assert code == 0 and "to store: 0 B in 0 files + 0 filtered tables" in text
+    assert (out / NAME).exists() and not (out / LEGACY_NAME).exists()
 
 
 def test_migrate_refuses_folders_it_did_not_make(server):

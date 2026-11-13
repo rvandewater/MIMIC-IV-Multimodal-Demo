@@ -1,14 +1,14 @@
-# MIMIC-IV Multimodal Demo
+# Multi-MIMIC: MIMIC-IV Multimodal Demo
 
-[![tests](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/tests.yaml/badge.svg)](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/tests.yaml)
-[![build](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/python-build.yaml/badge.svg)](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/python-build.yaml)
-[![live PhysioNet test](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/live.yaml/badge.svg)](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/actions/workflows/live.yaml)
-[![PyPI](https://img.shields.io/pypi/v/mimic-demo-mm)](https://pypi.org/project/mimic-demo-mm/)
+[![tests](https://github.com/rvandewater/Multi-MIMIC/actions/workflows/tests.yaml/badge.svg)](https://github.com/rvandewater/Multi-MIMIC/actions/workflows/tests.yaml)
+[![build](https://github.com/rvandewater/Multi-MIMIC/actions/workflows/python-build.yaml/badge.svg)](https://github.com/rvandewater/Multi-MIMIC/actions/workflows/python-build.yaml)
+[![live PhysioNet test](https://github.com/rvandewater/Multi-MIMIC/actions/workflows/live.yaml/badge.svg)](https://github.com/rvandewater/Multi-MIMIC/actions/workflows/live.yaml)
+[![PyPI](https://img.shields.io/pypi/v/multi-mimic)](https://pypi.org/project/multi-mimic/)
 ![python](https://img.shields.io/badge/-Python_3.10--3.14-blue?logo=python&logoColor=white)
 [![data: PhysioNet](https://img.shields.io/badge/data-PhysioNet-blue)](https://physionet.org/)
 [![cite](https://img.shields.io/badge/cite-datasets-informational)](#citing)
 
-Assemble a **local multimodal MIMIC-IV demo**: the 100 patients of the open
+**Multi-MIMIC** assembles a **local multimodal MIMIC-IV demo**: the 100 patients of the open
 MIMIC-IV demo, gathered across every MIMIC module. One command downloads (or
 extracts from local copies), shows progress, and finishes with a file check
 that verifies every file against its checksum.
@@ -42,7 +42,7 @@ together. Each column of the co-occurrence plot counts the patients with exactly
 that set of modalities.
 
 <!-- modality-overview:start -->
-_Not generated yet: run `uv run --extra figure mimic-demo-mm figure --readme README.md`
+_Not generated yet: run `uv run --extra figure multi-mimic figure --readme README.md`
 after a complete download (see [Overview figure](#overview-figure))._
 <!-- modality-overview:end -->
 
@@ -56,13 +56,13 @@ must have signed each project's data use agreement. Python 3.10 or later.
 With [uv](https://docs.astral.sh/uv/), no installation step is needed:
 
 ```bash
-pip install mimic-demo-mm              # or "mimic-demo-mm[figure]" for the overview figure
+pip install multi-mimic              # or "multi-mimic[figure]" for the overview figure
 physionet login                        # once: sign in through your browser, no password stored
-mimic-demo-mm download
+multi-mimic download
 ```
 
-Or, without installing anything: `uvx mimic-demo-mm download`. In a clone of this repository, use
-`uv run mimic-demo-mm ...`.
+Or, without installing anything: `uvx multi-mimic download`. In a clone of this repository, use
+`uv run multi-mimic ...`.
 
 The output goes to `./mimic-demo-multimodal`; change it with `--out DIR`.
 
@@ -112,7 +112,7 @@ The run goes through four stages:
 If you already have a full project on disk, extract the demo subset from it:
 
 ```bash
-uv run mimic-demo-mm download \
+uv run multi-mimic download \
     --local mimic-iv-note=/data/mimic-iv-note/2.2 \
     --local mimic-cxr-jpg=/data/mimic-cxr-jpg/2.1.0 \
     --link hardlink          # or symlink; default is copy
@@ -129,11 +129,11 @@ uv run mimic-demo-mm download \
 ### Choosing sources
 
 ```bash
-uv run mimic-demo-mm sources                                  # list them
-uv run mimic-demo-mm download --only mimic-iv-demo mimic-cxr-jpg
-uv run mimic-demo-mm download --skip mimic-iv-echo
-uv run mimic-demo-mm download --include mimic-cxr             # add the DICOM release
-uv run mimic-demo-mm download --subjects 10000032 10039708     # only these demo patients
+uv run multi-mimic sources                                  # list them
+uv run multi-mimic download --only mimic-iv-demo mimic-cxr-jpg
+uv run multi-mimic download --skip mimic-iv-echo
+uv run multi-mimic download --include mimic-cxr             # add the DICOM release
+uv run multi-mimic download --subjects 10000032 10039708     # only these demo patients
 ```
 
 `--subjects` limits the per-patient files and filtered tables to the patients
@@ -143,20 +143,20 @@ demos) stay whole.
 ### Checking later
 
 ```bash
-uv run mimic-demo-mm check              # verify every checksum
-uv run mimic-demo-mm check --quick      # sizes only
-uv run mimic-demo-mm check --fix        # re-fetch anything missing, partial or corrupt
+uv run multi-mimic check              # verify every checksum
+uv run multi-mimic check --quick      # sizes only
+uv run multi-mimic check --fix        # re-fetch anything missing, partial or corrupt
 ```
 
 The exit code is 0 when complete, 1 when incomplete, and 2 on an error such as
 a wrong password or an unsigned agreement. Paths of problem files go to
-`mimic-demo-mm.check-report.txt` next to the data.
+`multi-mimic.check-report.txt` next to the data.
 
 ### Overview figure
 
 ```bash
-uv run --extra figure mimic-demo-mm figure                       # writes docs/modality-overview-{light,dark}.svg
-uv run --extra figure mimic-demo-mm figure --readme README.md    # and refreshes the overview above
+uv run --extra figure multi-mimic figure                       # writes docs/modality-overview-{light,dark}.svg
+uv run --extra figure multi-mimic figure --readme README.md    # and refreshes the overview above
 ```
 
 It counts the files that pass a size check, so run it after a complete
@@ -194,8 +194,8 @@ mimic-demo-multimodal/
                                     mimic-cxr-2.0.0-metadata.csv.gz ...  (demo rows only)
   mimic-iv-echo-1.0.1/              files/... echo-record-list.csv ...
   mimic-iv-note-2.2/                note/discharge.csv.gz ...            (demo rows only)
-  mimic-demo-mm.manifest.json       what was planned and fetched
-  mimic-demo-mm.check-report.txt    only while the check finds problems
+  multi-mimic.manifest.json       what was planned and fetched
+  multi-mimic.check-report.txt    only while the check finds problems
 ```
 
 So a file at `https://physionet.org/files/mimic-iv-note/2.2/note/discharge.csv.gz`
@@ -222,7 +222,7 @@ is saved as `mimic-iv-note-2.2/note/discharge.csv.gz`.
 
 ### The manifest
 
-`mimic-demo-mm.manifest.json` lists every item the tool planned, per source:
+`multi-mimic.manifest.json` lists every item the tool planned, per source:
 - the path inside the project folder, and whether it's an exact copy or a
   filtered table;
 - PhysioNet's checksum and size, and its status (done, skipped or failed);
@@ -232,22 +232,26 @@ is saved as `mimic-iv-note-2.2/note/discharge.csv.gz`.
 `check` and `figure` read it. Because it names demo patients and their files,
 treat it as credentialed data, like the rest of the folder.
 
-### Upgrading from 0.1
+### Upgrading from mimic-demo-mm
 
-Version 0.1 of this tool saved projects as `<project>/<version>/` (for example
-`mimic4wdb/0.1.0/`). Version 0.2 uses `<project>-<version>/` to match the
-`physionet` package. The tool never renames folders on its own. If it finds the
+Before its first release, this tool was called `mimic-demo-mm` and saved projects
+as `<project>/<version>/` (for example `mimic4wdb/0.1.0/`). It now uses
+`<project>-<version>/` to match the `physionet` package. The tool never renames folders on its own. If it finds the
 old layout, `download`, `check` and `figure` stop and tell you which folders are
 affected. Then:
 
 ```bash
-uv run mimic-demo-mm migrate --out DIR --dry-run   # show what would be renamed
-uv run mimic-demo-mm migrate --out DIR             # rename them
+uv run multi-mimic migrate --out DIR --dry-run   # show what would be renamed
+uv run multi-mimic migrate --out DIR             # rename them
 ```
 
 Only the project folders are renamed: nothing inside them changes. Update any
 code that reads the old paths. `migrate` only works on a folder that has this
 tool's manifest, so it never touches a copy of PhysioNet made some other way.
+
+`mimic-demo-mm` also named its files `mimic-demo-mm.manifest.json` and `mimic-demo-mm.check-report.txt`. The tool
+still reads a manifest under the old name and renames it to
+`multi-mimic.manifest.json` the next time it saves.
 
 ## Privacy and data use
 
@@ -343,7 +347,7 @@ about 2 MB. It takes one to two minutes, mostly spent reading the waveform
 checksum list. It is off by default:
 
 ```bash
-MIMIC_DEMO_MM_LIVE=1 uv run --extra test pytest tests/test_live.py -v
+MULTI_MIMIC_LIVE=1 uv run --extra test pytest tests/test_live.py -v
 ```
 
 It downloads the MIMIC-IV-ED demo (about 120 KB) through `physionet.download`,

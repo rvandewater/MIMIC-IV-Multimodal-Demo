@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/mimic-demo-mm
+      url: https://pypi.org/p/multi-mimic
     permissions:
       id-token: write # IMPORTANT: mandatory for trusted publishing
 
