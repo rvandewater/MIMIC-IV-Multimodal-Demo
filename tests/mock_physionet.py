@@ -2,19 +2,22 @@
 
 Behaves like the real server where it matters: Basic auth on credentialed
 projects (401 bad password, 403 no data use agreement), HEAD with
-Content-Length, Range requests (206 / 416), directory listings, and
-SHA256SUMS.txt in every project except one (to exercise the crawl fallback).
+Content-Length, Range requests (206 / 416), directory listings,
+SHA256SUMS.txt in every project except one (to exercise the crawl fallback),
+and the API endpoint that lists a project's versions (used by physionet.download).
 One file drops the connection halfway on its first request (resume test).
 """
 from __future__ import annotations
 
 import base64
 import csv
+import json
 import gzip
 import hashlib
 import io
 import os
 import random
+import re
 import threading
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -174,7 +177,24 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    def _api(self, head: bool):
+        """GET /api/v1/projects/<slug>/versions/ (physionet.download looks up versions here)."""
+        m = re.fullmatch(r"/api/v1/projects/([^/]+)/versions/", self.path.split("?")[0])
+        proj = Path(self.directory) / m.group(1) if m else None
+        if proj is None or not proj.is_dir():
+            return self._deny(404)
+        body = json.dumps([{"slug": proj.name, "title": proj.name, "version": v.name, "abstract": "",
+                            "citation": ""} for v in sorted(proj.iterdir()) if v.is_dir()]).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if not head:
+            self.wfile.write(body)
+
     def _serve(self, head: bool):
+        if self.path.startswith("/api/v1/"):
+            return self._api(head)
         if not self.path.startswith("/files/"):
             return self._deny(404)
         rel = self.path[len("/files/"):].split("?")[0]
@@ -232,4 +252,4 @@ class Handler(SimpleHTTPRequestHandler):
 def serve(root: Path) -> tuple[ThreadingHTTPServer, str]:
     srv = ThreadingHTTPServer(("127.0.0.1", 0), partial(Handler, directory=str(root)))
     threading.Thread(target=srv.serve_forever, daemon=True).start()
-    return srv, f"http://127.0.0.1:{srv.server_address[1]}/files"
+    return srv, f"http://127.0.0.1:{srv.server_address[1]}"

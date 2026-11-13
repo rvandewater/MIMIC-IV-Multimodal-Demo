@@ -6,6 +6,7 @@
                                                 take subsets from local copies instead
   mimic-demo-mm check [--fix]                   verify every file; re-fetch broken ones
   mimic-demo-mm figure [--readme README.md]     draw the modality coverage / co-occurrence overview
+  mimic-demo-mm migrate [--dry-run]             rename folders from the 0.1 layout
 """
 from __future__ import annotations
 
@@ -17,8 +18,9 @@ from pathlib import Path
 
 from . import __version__
 from .check import report, verify
-from .download import Runner, demo_ids, make_origins, plan, summarize_plan
-from .http import Client, PhysioNetError
+from .download import (Runner, demo_ids, make_origins, migrate_layout, plan, require_current_layout,
+                       summarize_plan)
+from .http import DEFAULT_BASE_URL, Client, PhysioNetError, base_url
 from .manifest import Manifest
 from .sources import BY_KEY, SOURCES, select
 
@@ -38,10 +40,21 @@ def _local_map(pairs: list[str] | None, man: Manifest | None = None) -> dict[str
 
 
 def _client(sources, local, user) -> Client:
+    """Sign-in for credentialed sources, in this order: --user (or PHYSIONET_USER /
+    PHYSIONET_USERNAME) with PHYSIONET_PASSWORD or a prompt; PHYSIONET_TOKEN; the
+    sign-in saved by `physionet login`; else ask for a username and password."""
     remote_cred = [s.key for s in sources if s.credentialed and s.key not in local]
     if not remote_cred:
         return Client()
-    user = user or os.environ.get("PHYSIONET_USER") or input("PhysioNet username: ").strip()
+    user = user or os.environ.get("PHYSIONET_USER") or os.environ.get("PHYSIONET_USERNAME")
+    if not user:
+        if os.environ.get("PHYSIONET_TOKEN"):
+            return Client(token=os.environ["PHYSIONET_TOKEN"])
+        from physionet.auth import load_saved_login
+        if load_saved_login(base_url()) is not None:
+            return Client()   # the physionet package uses the saved sign-in
+        print("  (tip: `uv run physionet login` signs in once, without a password here)")
+        user = input("PhysioNet username: ").strip()
     pw = os.environ.get("PHYSIONET_PASSWORD") or getpass.getpass(f"PhysioNet password for {user}: ")
     return Client(user, pw)
 
@@ -56,12 +69,19 @@ def cmd_sources(a) -> int:
     return 0
 
 
-def _download(root: Path, sources, local, link, user, jobs, yes, plan_only, quick) -> int:
+def _download(root: Path, sources, local, link, user, jobs, yes, plan_only, quick,
+              source="auto", subjects=None) -> int:
     root.mkdir(parents=True, exist_ok=True)
+    require_current_layout(root)
     client = _client(sources, local, user)
     origins = make_origins(sources, client, local, link, root)
     man = Manifest.load(root)
     ids = demo_ids(client, root, local)
+    if subjects:
+        unknown = set(subjects) - ids
+        if unknown:
+            raise SystemExit(f"--subjects: {len(unknown)} ID(s) are not MIMIC-IV demo patients")
+        ids = set(subjects)
     man.demo_subjects = len(ids)
     print(f"mimic-demo-mm {__version__}: {len(ids)} demo patients -> {root}\n\nListing files")
     items = plan(origins, sources, ids, man, jobs)
@@ -79,7 +99,9 @@ def _download(root: Path, sources, local, link, user, jobs, yes, plan_only, quic
             return 0
     if files or tables:
         print()
-        Runner(origins, root, man, ids, jobs).run(files, tables)
+        if client.base_url != DEFAULT_BASE_URL:
+            source = "physionet"   # a test server or mirror: never the AWS copy of the real projects
+        Runner(origins, root, man, ids, jobs, client=client, source=source).run(files, tables)
     res = verify(root, man, [s.key for s in sources], quick)
     return 0 if report(root, man, res, quick) else 1
 
@@ -87,11 +109,13 @@ def _download(root: Path, sources, local, link, user, jobs, yes, plan_only, quic
 def cmd_download(a) -> int:
     sources = select(a.only, a.skip, a.include)
     local = _local_map(a.local)
-    return _download(Path(a.out).resolve(), sources, local, a.link, a.user, a.jobs, a.yes, a.plan, a.quick_check)
+    return _download(Path(a.out).resolve(), sources, local, a.link, a.user, a.jobs, a.yes, a.plan, a.quick_check,
+                     a.source, a.subjects)
 
 
 def cmd_check(a) -> int:
     root = Path(a.out).resolve()
+    require_current_layout(root)
     man = Manifest.load(root)
     if not man.items:
         print(f"No manifest in {root}. Run `mimic-demo-mm download` first (or pass --out).")
@@ -110,7 +134,16 @@ def cmd_check(a) -> int:
     print(f"\nFixing {len(bad):,} file(s)...")
     sources = [BY_KEY[k] for k in man.sources if k in BY_KEY]
     local = _local_map(a.local, man)
-    return _download(root, sources, local, a.link, a.user, a.jobs, True, False, False)
+    return _download(root, sources, local, a.link, a.user, a.jobs, True, False, False, a.source)
+
+
+def cmd_migrate(a) -> int:
+    root = Path(a.out).resolve()
+    if not (root / "mimic-demo-mm.manifest.json").exists():
+        print(f"x {root} has no mimic-demo-mm manifest: not a folder this tool made, nothing changed")
+        return 2
+    migrate_layout(root, a.dry_run)
+    return 0
 
 
 def cmd_figure(a) -> int:
@@ -136,13 +169,18 @@ def main(argv=None) -> int:
 
     def common(p):
         p.add_argument("--out", default="mimic-demo-multimodal", help="output folder (default: %(default)s)")
-        p.add_argument("--user", help="PhysioNet username (or env PHYSIONET_USER; password: env PHYSIONET_PASSWORD or prompt)")
+        p.add_argument("--user", help="PhysioNet username (or env PHYSIONET_USER; password: env PHYSIONET_PASSWORD "
+                                      "or prompt). Without it: PHYSIONET_TOKEN, or the sign-in saved by `physionet login`")
         p.add_argument("--local", action="append", metavar="SOURCE=FOLDER",
                        help="take this source from a local copy instead of PhysioNet (repeatable), "
                             "e.g. mimic-iv-note=/data/mimic-iv-note/2.2")
         p.add_argument("--link", choices=["copy", "hardlink", "symlink"], default="copy",
                        help="for --local sources: copy files (default), or hard-link / symlink to save space")
-        p.add_argument("--jobs", type=int, default=4, help="parallel downloads (default: %(default)s)")
+        p.add_argument("--jobs", type=int, default=4,
+                       help="parallel size checks, local copies and fallback downloads (default: %(default)s)")
+        p.add_argument("--source", choices=["auto", "physionet", "aws"], default="auto",
+                       help="where the physionet package downloads files from: auto (AWS open-data mirror "
+                            "when a project is on it, else PhysioNet), physionet or aws (default: %(default)s)")
 
     d = sub.add_parser("download", help="download / extract everything, then check it")
     common(d)
@@ -152,6 +190,8 @@ def main(argv=None) -> int:
     d.add_argument("--yes", "-y", action="store_true", help="don't ask before starting")
     d.add_argument("--plan", action="store_true", help="only list what would be fetched and how big it is")
     d.add_argument("--quick-check", action="store_true", help="final check by size only (skip checksums)")
+    d.add_argument("--subjects", nargs="+", metavar="ID",
+                   help="only these demo patients (for a quick or partial download); full sources stay whole")
     d.set_defaults(fn=cmd_download)
 
     c = sub.add_parser("check", help="verify every file against its checksum")
@@ -159,6 +199,12 @@ def main(argv=None) -> int:
     c.add_argument("--quick", action="store_true", help="sizes only (skip checksums)")
     c.add_argument("--fix", action="store_true", help="re-fetch missing, partial or corrupt files")
     c.set_defaults(fn=cmd_check)
+
+    m = sub.add_parser("migrate", help="rename folders from the 0.1 layout (<project>/<version>/) "
+                                       "to <project>-<version>/")
+    m.add_argument("--out", default="mimic-demo-multimodal", help="data folder (default: %(default)s)")
+    m.add_argument("--dry-run", action="store_true", help="only show what would be renamed")
+    m.set_defaults(fn=cmd_migrate)
 
     g = sub.add_parser("figure", help="draw the modality coverage and co-occurrence overview (counts only)")
     g.add_argument("--out", default="mimic-demo-multimodal", help="data folder (default: %(default)s)")

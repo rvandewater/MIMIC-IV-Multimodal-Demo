@@ -5,6 +5,11 @@ MIMIC-IV demo, gathered across every MIMIC module. One command downloads (or
 extracts from local copies), shows progress, and finishes with a file check
 that verifies every file against its checksum.
 
+Downloads go through the official [`physionet`](https://github.com/MIT-LCP/physionet)
+package (sign-in, resume, retries, checksums). See
+[How and where data is saved](#how-and-where-data-is-saved) for exactly what
+ends up on your disk.
+
 | source | access | what is fetched |
 |---|---|---|
 | `mimic-iv-demo` 2.2 | open | everything: structured, categorical and numeric EHR events |
@@ -36,18 +41,31 @@ after a complete download (see [Overview figure](#overview-figure))._
 ## Access
 
 For the credentialed sources you need a credentialed PhysioNet account, and you
-must have signed each project's data use agreement.
+must have signed each project's data use agreement. Python 3.10 or later.
 
 ## Run
 
 With [uv](https://docs.astral.sh/uv/), no installation step is needed:
 
 ```bash
-uv run mimic-demo-mm download --user YOUR_PHYSIONET_USERNAME
+uv run physionet login                 # once: sign in through your browser, no password stored
+uv run mimic-demo-mm download
 ```
 
-This asks for your password once. You can instead set `PHYSIONET_USER` and
-`PHYSIONET_PASSWORD`. The output goes to `./mimic-demo-multimodal`; change it with `--out DIR`.
+The output goes to `./mimic-demo-multimodal`; change it with `--out DIR`.
+
+**Signing in.** Only the credentialed sources need it. The first of these that
+is set is used:
+1. `--user NAME` (or `PHYSIONET_USER` / `PHYSIONET_USERNAME`), with the
+   password from `PHYSIONET_PASSWORD` or asked once;
+2. `PHYSIONET_TOKEN`, a personal access token from PhysioNet (Settings > Tokens),
+   for unattended runs;
+3. the sign-in saved by `physionet login`;
+4. otherwise the tool asks for a username and password.
+
+Credentials are only sent to physionet.org, and this tool stores none of them.
+`physionet login` keeps its sign-in in `~/.config/physionet/credentials.json`
+(the `physionet` package manages that file).
 
 The run goes through four stages:
 
@@ -60,13 +78,18 @@ The run goes through four stages:
    to store and your free space, then asks before starting. `--yes` skips the
    question; `--plan` stops here.
 3. **Download.**
-   - **Files** download in parallel (`--jobs`, default 4) with one overall
-     progress bar. Each file is checked against its checksum.
+   - **Files** are downloaded by `physionet.download`, one source at a time,
+     with one overall progress bar. Each file is checked against PhysioNet's
+     checksum. Open projects that are on the AWS open-data mirror come from
+     there (`--source auto`, the default); `--source physionet` always uses
+     physionet.org.
    - **Interrupted files** resume where they stopped. Ctrl-C is safe: run the
      same command again to continue.
    - **Tables** are streamed and filtered on the fly, keeping only demo-patient
      rows. Each table gets its own progress bar, and the full tables never
-     touch your disk.
+     touch your disk. The `physionet` package can only download whole files,
+     so this part, and projects without a `SHA256SUMS.txt`, use the tool's own
+     code with the package's sign-in.
 4. **File check.** Every expected file is verified against its checksum.
    - **Per-source result:** a table of ok, missing, partial and corrupt counts,
      with COMPLETE or INCOMPLETE for each source.
@@ -98,7 +121,12 @@ uv run mimic-demo-mm sources                                  # list them
 uv run mimic-demo-mm download --only mimic-iv-demo mimic-cxr-jpg
 uv run mimic-demo-mm download --skip mimic-iv-echo
 uv run mimic-demo-mm download --include mimic-cxr             # add the DICOM release
+uv run mimic-demo-mm download --subjects 10000032 10000084     # only these demo patients
 ```
+
+`--subjects` limits the per-patient files and filtered tables to the patients
+you name, for a quick test or a partial copy. Sources fetched whole (the open
+demos) stay whole.
 
 ### Checking later
 
@@ -133,25 +161,81 @@ The figure and table show patient counts only, never IDs.
 Combinations with fewer than 5 patients are merged into one "other" column.
 Change the threshold with `--min-count N`; `--min-count 1` shows everything.
 
-## Output layout
+## How and where data is saved
+
+Everything goes into one folder (`--out`, default `./mimic-demo-multimodal`).
+Nothing is written anywhere else: no cache, no temporary copies of full tables.
+
+### Folder layout
+
+One folder per project, named **`<project>-<version>`**, the name
+`physionet.download` gives it. Inside, every path is the same as on PhysioNet.
 
 ```
 mimic-demo-multimodal/
-  mimic-iv-demo/2.2/...                        (PhysioNet's own layout)
-  mimic4wdb/0.1.0/waves/p100/p100xxxxx/<record>/<record>.hea ...
-  mimic-cxr-jpg/2.1.0/files/p10/p10000032/s.../....jpg
-  mimic-cxr-jpg/2.1.0/mimic-cxr-2.0.0-metadata.csv.gz   (demo patients' rows only)
-  mimic-iv-echo/1.0.1/files/...  echo-record-list.csv ...
-  mimic-iv-note/2.2/note/discharge.csv.gz ...           (demo patients' rows only)
-  mimic-demo-mm.manifest.json                  every expected item, checksums, row counts
+  mimic-iv-demo-2.2/                hosp/ icu/ demo_subject_id.csv ...  (whole project)
+  mimic-iv-ed-demo-2.2/             ed/ ...                              (whole project)
+  mimic-iv-ecg-demo-0.1/            files/p1000/p1000xxxx/s.../...       (whole project)
+  mimic-iv-ecg-1.0/                 machine_measurements.csv ...         (demo rows only)
+  mimic4wdb-0.1.0/                  waves/p100/p100xxxxx/<record>/...    (demo patients only)
+  mimic-cxr-jpg-2.1.0/              files/p10/p10xxxxxx/s.../*.jpg       (demo patients only)
+                                    mimic-cxr-2.0.0-metadata.csv.gz ...  (demo rows only)
+  mimic-iv-echo-1.0.1/              files/... echo-record-list.csv ...
+  mimic-iv-note-2.2/                note/discharge.csv.gz ...            (demo rows only)
+  mimic-demo-mm.manifest.json       what was planned and fetched
+  mimic-demo-mm.check-report.txt    only while the check finds problems
 ```
 
-**How tables are kept:**
-- **Same name as on PhysioNet, demo patients' rows only.** This holds for
-  every table outside `files/` in the `demo` and `tables` sources.
-- **Kept whole:** tables without a `subject_id` column that are 200 MB or
-  smaller, such as data dictionaries and the echo study list.
-- **Skipped:** other top-level files over 10 MB, such as `IMAGE_FILENAMES`.
+So a file at `https://physionet.org/files/mimic-iv-note/2.2/note/discharge.csv.gz`
+is saved as `mimic-iv-note-2.2/note/discharge.csv.gz`.
+
+### What each file is
+
+| kind | what is saved | how it is verified |
+|---|---|---|
+| **Exact copy** | the file as published: everything in the open demos, and the demo patients' files under `files/` or `waves/` | PhysioNet's SHA-256 checksum |
+| **Filtered table** | a top-level table (`.csv` / `.csv.gz`) with a `subject_id` column: same name, same columns, same compression, only the demo patients' rows | the checksum of the filtered file, recorded in the manifest when it was written |
+| **Kept whole** | a table without a `subject_id` column, 200 MB or smaller (data dictionaries, the echo study list) | PhysioNet's checksum |
+| **Not saved** | other top-level files over 10 MB (such as `IMAGE_FILENAMES`), and tables without a `subject_id` column over 200 MB | listed in the manifest as skipped |
+
+### While downloading
+
+- **Filtered tables** are written to `<name>.part` and renamed when complete,
+  so a table under its real name is always complete.
+- **Files from `physionet.download`** are written under their final name. If a
+  download is interrupted, a shorter file stays there until the next run
+  resumes it. `check` reports such a file as *partial*.
+- **Files from local copies** (`--local`) are copied, hard-linked or symlinked
+  (`--link`). A symlink points into your local copy, so moving that copy breaks it.
+
+### The manifest
+
+`mimic-demo-mm.manifest.json` lists every item the tool planned, per source:
+- the path inside the project folder, and whether it's an exact copy or a
+  filtered table;
+- PhysioNet's checksum and size, and its status (done, skipped or failed);
+- for a filtered table: the checksum and size of the filtered file, how many
+  rows were kept of how many, and which demo patients it covers.
+
+`check` and `figure` read it. Because it names demo patients and their files,
+treat it as credentialed data, like the rest of the folder.
+
+### Upgrading from 0.1
+
+Version 0.1 of this tool saved projects as `<project>/<version>/` (for example
+`mimic4wdb/0.1.0/`). Version 0.2 uses `<project>-<version>/` to match the
+`physionet` package. The tool never renames folders on its own. If it finds the
+old layout, `download`, `check` and `figure` stop and tell you which folders are
+affected. Then:
+
+```bash
+uv run mimic-demo-mm migrate --out DIR --dry-run   # show what would be renamed
+uv run mimic-demo-mm migrate --out DIR             # rename them
+```
+
+Only the project folders are renamed: nothing inside them changes. Update any
+code that reads the old paths. `migrate` only works on a folder that has this
+tool's manifest, so it never touches a copy of PhysioNet made some other way.
 
 ## Privacy and data use
 
@@ -170,9 +254,24 @@ uv run --extra test pytest -q
 ```
 
 The tests run end to end against `tests/mock_physionet.py`, a local stand-in
-for PhysioNet's file server with synthetic data. It reproduces:
+for PhysioNet with synthetic data. The real `physionet` package downloads
+from it. It reproduces:
 - credentialed-project passwords, including a rejected password and an account
   with no signed agreement;
-- resumable downloads, size checks and folder listings;
+- resumable downloads, size checks and folder listings, and the API endpoint
+  that lists a project's versions;
 - a project without checksums;
 - a file whose connection drops halfway.
+
+**Live test.** `tests/test_live.py` runs against the real PhysioNet and uses
+about 2 MB. It takes one to two minutes, mostly spent reading the waveform
+checksum list. It is off by default:
+
+```bash
+MIMIC_DEMO_MM_LIVE=1 uv run --extra test pytest tests/test_live.py -v
+```
+
+It downloads the MIMIC-IV-ED demo (about 120 KB) through `physionet.download`,
+checks it, confirms a second run fetches nothing, and draws the figure. It also
+plans one waveform patient without downloading their files. With a PhysioNet
+sign-in it also plans MIMIC-IV-Note, reading only each table's header.

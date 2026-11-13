@@ -53,7 +53,7 @@ def verify(root: Path, man: Manifest, keys: list[str] | None = None, quick: bool
 
 
 def _ed_subjects(root: Path) -> set[str]:
-    p = root / "mimic-iv-ed-demo/2.2/ed/edstays.csv.gz"
+    p = root / BY_KEY["mimic-iv-ed-demo"].rel / "ed/edstays.csv.gz"
     if not p.exists():
         return set()
     with gzip.open(p, "rt", newline="") as f:

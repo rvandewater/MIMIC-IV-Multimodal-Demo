@@ -59,7 +59,7 @@ def _crawl(client: Client, src: Source, auth: bool, roots: list[str], keep, deep
             continue
         seen.add(d)
         try:
-            html = client.request("GET", f"{src.rel}/{d}", auth=auth).text
+            html = client.request("GET", f"{src.remote}/{d}", auth=auth).text
         except NotFound:
             continue
         for href in HREF.findall(html):
@@ -80,7 +80,7 @@ def list_files(client: Client, src: Source, demo_ids: set[str]) -> tuple[list[tu
     auth = src.credentialed
     keep = keep_fn(src, demo_ids)
     try:
-        r = client.request("GET", f"{src.rel}/SHA256SUMS.txt", auth=auth, stream=True)
+        r = client.request("GET", f"{src.remote}/SHA256SUMS.txt", auth=auth, stream=True)
         total = int(r.headers.get("Content-Length") or 0) or None
         bar = tqdm(total=total, unit="B", unit_scale=True, desc=f"  listing {src.key}", leave=False)
 

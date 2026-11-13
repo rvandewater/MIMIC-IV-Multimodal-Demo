@@ -19,7 +19,7 @@ from pathlib import Path
 
 from .check import OK, coverage, verify
 from .manifest import Manifest
-from .sources import DEMO_IDS
+from .sources import BY_KEY, DEMO_IDS
 
 START, END = "<!-- modality-overview:start -->", "<!-- modality-overview:end -->"
 # Matrix rows, top to bottom. EHR is left out: every demo patient has it.
@@ -37,7 +37,7 @@ THEMES = {   # single series: one hue, neutral ink (validated against both surfa
 # ---------------------------------------------------------------- data
 def modality_sets(root: Path, man: Manifest, res: dict) -> tuple[set[str], dict[str, set[str]], bool]:
     """-> (all demo patients, {group: patients with it}, whether EHR covers everyone)."""
-    p = root / DEMO_IDS[0] / DEMO_IDS[1]
+    p = root / BY_KEY["mimic-iv-demo"].rel / DEMO_IDS
     universe = set(re.findall(r"\b\d{8}\b", p.read_text())) if p.exists() else set()
     groups: dict[str, set[str]] = {}
     has_ehr = False
@@ -223,6 +223,8 @@ def update_readme(readme: Path, block: str) -> bool:
 
 
 def run(root: Path, to: Path, readme: Path | None, min_count: int = MIN_COUNT) -> int:
+    from .download import require_current_layout
+    require_current_layout(root)
     man = Manifest.load(root)
     if not man.items:
         print(f"No manifest in {root}. Run `mimic-demo-mm download` first (or pass --out).")
