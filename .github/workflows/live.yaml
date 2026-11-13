@@ -1,0 +1,29 @@
+# The live test against the real PhysioNet (tests/test_live.py): open data only, about 2 MB.
+# Never give this workflow a PhysioNet sign-in (no PHYSIONET_TOKEN or password secrets):
+# credentialed MIMIC data must not be downloaded to GitHub's machines, and the
+# credentialed part of the test stays skipped without one.
+
+name: Live PhysioNet test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays: notices when PhysioNet or the physionet package changes
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Run the live test
+        env:
+          MIMIC_DEMO_MM_LIVE: "1"
+        run: uv run --extra test pytest tests/test_live.py -v
