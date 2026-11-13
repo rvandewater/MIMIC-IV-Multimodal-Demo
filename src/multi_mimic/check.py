@@ -17,7 +17,8 @@ from .sources import BY_KEY
 from .tables import sha256_file
 
 OK, MISSING, INCOMPLETE, CORRUPT, SKIPPED = "ok", "missing", "incomplete", "corrupt", "skipped"
-REPORT = "mimic-demo-mm.check-report.txt"
+REPORT = "multi-mimic.check-report.txt"
+LEGACY_REPORT = "mimic-demo-mm.check-report.txt"   # written by the pre-release mimic-demo-mm
 
 
 def verify_item(root: Path, it: Item, quick: bool) -> str:
@@ -129,15 +130,16 @@ def report(root: Path, man: Manifest, res: dict, quick: bool) -> bool:
 
     bad = [(k, v) for k, v in res.items() if v in (MISSING, INCOMPLETE, CORRUPT)]
     rep = root / REPORT
+    (root / LEGACY_REPORT).unlink(missing_ok=True)   # replaced by the report below, if any
     if bad:
         with open(rep, "w") as f:
             for (src, path), st in sorted(bad):
                 note = man.items[(src, path)].note
                 f.write(f"{st}\t{BY_KEY[src].rel}/{path}\t{note}\n")
         print(f"\nINCOMPLETE: {len(bad):,} problem file(s), listed in {rep} (local file).")
-        print("Run `mimic-demo-mm check --fix` (or the same download command again) to fetch them.")
+        print("Run `multi-mimic check --fix` (or the same download command again) to fetch them.")
     else:
         rep.unlink(missing_ok=True)
         print("\nCOMPLETE: every expected file is present and matches its checksum." if not quick else
-              "\nCOMPLETE (sizes only): run `mimic-demo-mm check` for full checksum verification.")
+              "\nCOMPLETE (sizes only): run `multi-mimic check` for full checksum verification.")
     return complete and not bad

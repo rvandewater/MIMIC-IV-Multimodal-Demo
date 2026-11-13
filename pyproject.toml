@@ -3,8 +3,8 @@ requires = ["hatchling>=1.18", "hatch-vcs>=0.4"]
 build-backend = "hatchling.build"
 
 [project]
-name = "mimic-demo-mm"
-dynamic = ["version"]   # from the git tag (hatch-vcs): tag v0.2.0 builds version 0.2.0
+name = "Multi-MIMIC"   # PyPI normalizes it to multi-mimic
+dynamic = ["version"]   # from the git tag (hatch-vcs): tag v0.0.1 builds version 0.0.1
 description = "Assemble a local multimodal MIMIC-IV demo: the 100 demo patients across EHR, ECG, ICU waveforms, chest X-ray, echo and notes"
 readme = "README.md"
 requires-python = ">=3.10"   # as the physionet package
@@ -26,11 +26,11 @@ classifiers = [
 dependencies = ["physionet>=0.3.0", "requests>=2.28", "tqdm>=4.60"]
 
 [project.urls]
-Homepage = "https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo"
-Issues = "https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo/issues"
+Homepage = "https://github.com/rvandewater/Multi-MIMIC"
+Issues = "https://github.com/rvandewater/Multi-MIMIC/issues"
 
 [project.scripts]
-mimic-demo-mm = "mimic_demo_mm.cli:main"
+multi-mimic = "multi_mimic.cli:main"
 
 [project.optional-dependencies]
 test = ["pytest>=7", "matplotlib>=3.6"]
@@ -41,7 +41,7 @@ source = "vcs"
 fallback-version = "0.0.0"   # a checkout without git history
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/mimic_demo_mm"]
+packages = ["src/multi_mimic"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

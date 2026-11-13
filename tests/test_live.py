@@ -5,7 +5,7 @@ database's checksum list, which PhysioNet serves slowly.
 
 Off by default. Run it with:
 
-    MIMIC_DEMO_MM_LIVE=1 uv run --extra test pytest tests/test_live.py -v
+    MULTI_MIMIC_LIVE=1 uv run --extra test pytest tests/test_live.py -v
 
 What it covers, and what it costs:
 - MIMIC-IV-ED demo: a real download through physionet.download (7 files, about
@@ -30,11 +30,11 @@ from contextlib import redirect_stdout
 
 import pytest
 
-from mimic_demo_mm.cli import main
-from mimic_demo_mm.manifest import NAME
+from multi_mimic.cli import main
+from multi_mimic.manifest import NAME
 
-pytestmark = pytest.mark.skipif(os.environ.get("MIMIC_DEMO_MM_LIVE") != "1",
-                                reason="live PhysioNet test: set MIMIC_DEMO_MM_LIVE=1")
+pytestmark = pytest.mark.skipif(os.environ.get("MULTI_MIMIC_LIVE") != "1",
+                                reason="live PhysioNet test: set MULTI_MIMIC_LIVE=1")
 
 WAVEFORM_PATIENT = "10039708"   # the demo patient with the least waveform data (30 files, 25 MB)
 

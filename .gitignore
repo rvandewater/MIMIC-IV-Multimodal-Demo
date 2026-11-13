@@ -2,6 +2,9 @@
 docs/modality-overview-*.svg
 docs/modality-overview-*.png
 mimic-demo-multimodal/
+multi-mimic.manifest.json
+multi-mimic.check-report.txt
+# the same, under the names of the pre-release mimic-demo-mm
 mimic-demo-mm.manifest.json
 mimic-demo-mm.check-report.txt
 

@@ -83,7 +83,7 @@ DEMO_IDS = "demo_subject_id.csv"   # in mimic-iv-demo
 def select(only=None, skip=None, include=None) -> list[Source]:
     unknown = [k for k in (only or []) + (skip or []) + (include or []) if k not in BY_KEY]
     if unknown:
-        raise SystemExit(f"unknown source(s): {', '.join(unknown)}. See: mimic-demo-mm sources")
+        raise SystemExit(f"unknown source(s): {', '.join(unknown)}. See: multi-mimic sources")
     if only:
         chosen = [BY_KEY[k] for k in only]
     else:

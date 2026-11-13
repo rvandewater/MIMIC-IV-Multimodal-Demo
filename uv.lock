@@ -993,7 +993,7 @@ wheels = [
 ]
 
 [[package]]
-name = "mimic-demo-mm"
+name = "multi-mimic"
 source = { editable = "." }
 dependencies = [
     { name = "physionet" },

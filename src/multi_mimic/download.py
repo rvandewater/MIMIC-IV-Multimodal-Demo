@@ -50,10 +50,10 @@ def local_path(root: Path, item: Item) -> Path:
 
 
 def old_layout(root: Path) -> list[Source]:
-    """Sources still stored in the <slug>/<version>/ layout of mimic-demo-mm 0.1, in a
+    """Sources still stored in the <slug>/<version>/ layout of the pre-release mimic-demo-mm, in a
     folder this tool made (it has the manifest): never someone else's copy of PhysioNet."""
-    from .manifest import NAME
-    if not (root / NAME).exists():
+    from .manifest import manifest_file
+    if manifest_file(root) is None:
         return []
     return [s for s in SOURCES if (root / s.old_rel).is_dir() and not (root / s.rel).exists()]
 
@@ -64,9 +64,9 @@ def require_current_layout(root: Path) -> None:
     if old:
         names = ", ".join(f"{s.old_rel}/ -> {s.rel}/" for s in old)
         raise SystemExit(
-            f"x {root} uses the folder layout of mimic-demo-mm 0.1 ({names}).\n"
+            f"x {root} uses the folder layout of the pre-release mimic-demo-mm ({names}).\n"
             "  Data is now saved as <project>-<version>/, the layout of the physionet package.\n"
-            f"  Rename the folders with:  mimic-demo-mm migrate --out {root}\n"
+            f"  Rename the folders with:  multi-mimic migrate --out {root}\n"
             "  (add --dry-run to see what changes; update any code that reads the old paths).")
 
 
